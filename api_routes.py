@@ -11,8 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 
 from config import (
-    CAMERAS, DEFAULT_CAMERA, RECORDINGS_DIR,
-    RECORDING_ENABLED, DETECTION_ENABLED, logger
+    CAMERAS, DEFAULT_CAMERA, RECORDINGS_DIR, logger, config
 )
 from html_template import HTML_TEMPLATE
 from models import CameraROIRequest
@@ -215,36 +214,34 @@ def setup_routes(
     
     @app.post("/toggle_recording")
     async def toggle_recording(request: Request):
-        global RECORDING_ENABLED
         try:
             data = await request.json()
             new_state = data.get('enabled', True)
             detector = get_detector()
             
-            if not new_state and RECORDING_ENABLED:
+            if not new_state and config.recording_enable:
                 if detector and hasattr(detector, 'video_recorder'):
                     if detector.video_recorder.recording:
                         logger.info("Stopping current recording due to disable...")
                         detector.video_recorder.stop_recording()
             
-            RECORDING_ENABLED = new_state
-            status = "ON" if RECORDING_ENABLED else "OFF"
+            config.recording_enable = new_state
+            status = "ON" if config.recording_enable else "OFF"
             logger.info(f"Recording toggled: {status}")
-            return {"status": "ok", "recording_enabled": RECORDING_ENABLED}
+            return {"status": "ok", "recording_enabled": config.recording_enable}
         except Exception as e:
             logger.error(f"Error toggling recording: {e}")
             return {"status": "error", "message": str(e)}
     
     @app.post("/toggle_detection")
     async def toggle_detection(request: Request):
-        global DETECTION_ENABLED
         try:
             data = await request.json()
             new_state = data.get('enabled', True)
-            DETECTION_ENABLED = new_state
-            status = "ON" if DETECTION_ENABLED else "OFF"
+            config.detection_enabled = new_state
+            status = "ON" if config.detection_enabled else "OFF"
             logger.info(f"Detection toggled: {status}")
-            return {"status": "ok", "detection_enabled": DETECTION_ENABLED}
+            return {"status": "ok", "detection_enabled": config.detection_enabled}
         except Exception as e:
             logger.error(f"Error toggling detection: {e}")
             return {"status": "error", "message": str(e)}
@@ -342,8 +339,8 @@ def setup_routes(
             status = {
                 "status": "running",
                 "detector": detector is not None and detector.running,
-                "recording_enabled": RECORDING_ENABLED,
-                "detection_enabled": DETECTION_ENABLED,
+                "recording_enabled": config.recording_enable,
+                "detection_enabled": config.detection_enabled,
                 "recordings_count": len(glob.glob(os.path.join(RECORDINGS_DIR, "motion_*.mp4"))),
             }
             if detector:

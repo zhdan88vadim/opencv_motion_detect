@@ -8,8 +8,7 @@ import gc
 import os
 
 from config import (
-    DETECTION_ENABLED, RECORDING_ENABLED, DEFAULT_CAMERA,
-    RECORDINGS_DIR, shutdown_flag, logger
+    DEFAULT_CAMERA, RECORDINGS_DIR, logger, config
 )
 from roi_manager import ROIManager
 from video_recorder import VideoRecorder
@@ -112,7 +111,7 @@ class MotionDetector:
     
     def _broadcast_status(self):
         last_status = None
-        while self.sse_running and self.running and not shutdown_flag:
+        while self.sse_running and self.running and not config.shutdown_flag:
             try:
                 status = self.get_motion_status()
                 if status != last_status:
@@ -165,8 +164,8 @@ class MotionDetector:
                 'threshold': self.motion_threshold,
                 'min_area': self.min_area,
                 'recording': self.video_recorder.recording if self.video_recorder else False,
-                'recording_enabled': RECORDING_ENABLED,
-                'detection_enabled': DETECTION_ENABLED,
+                'recording_enabled': config.recording_enable,
+                'detection_enabled': config.detection_enabled,
                 'has_audio': self.has_audio,
                 'camera_name': self.camera_name,
             }
@@ -186,8 +185,8 @@ class MotionDetector:
                 'threshold': self.motion_threshold,
                 'min_area': self.min_area,
                 'recording': False,
-                'recording_enabled': RECORDING_ENABLED,
-                'detection_enabled': DETECTION_ENABLED,
+                'recording_enabled': config.recording_enable,
+                'detection_enabled': config.detection_enabled,
                 'has_audio': self.has_audio,
                 'camera_name': self.camera_name,
             }
@@ -208,19 +207,19 @@ class MotionDetector:
         MAX_TIMEOUTS = 5
         reconnect_delay = 1
         
-        while self.running and not shutdown_flag:
+        while self.running and not config.shutdown_flag:
             try:
                 with self.lock:
-                    if not self.running or shutdown_flag:
+                    if not self.running or config.shutdown_flag:
                         break
                     self.frame_processing = True
                 
-                if DETECTION_ENABLED and detection_was_disabled:
+                if config.detection_enabled and detection_was_disabled:
                     self._init_capture()
                     detection_was_disabled = False
                     print("🎯 Detection restarted - capture reinitialized")
                 
-                if not DETECTION_ENABLED:
+                if not config.detection_enabled:
                     detection_was_disabled = True
                     placeholder = np.zeros((DISPLAY_HEIGHT, DISPLAY_WIDTH, 3), dtype=np.uint8)
                     cv2.putText(placeholder, "MOTION DETECTION", 

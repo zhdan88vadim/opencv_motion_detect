@@ -9,7 +9,7 @@ import numpy as np
 
 from config import (
     RECORDINGS_DIR, RECORD_BUFFER_SECONDS, RECORD_AFTER_SECONDS,
-    MIN_RECORD_SECONDS, MAX_RECORD_SECONDS, RECORDING_ENABLED, logger
+    MIN_RECORD_SECONDS, MAX_RECORD_SECONDS, logger, config
 )
 
 class VideoRecorder:
@@ -143,7 +143,7 @@ class VideoRecorder:
         self.recording = False
     
     def process_motion(self, is_motion, frame, timestamp):
-        if not self.running or not RECORDING_ENABLED:
+        if not self.running or not config.recording_enable:
             return
         
         try:

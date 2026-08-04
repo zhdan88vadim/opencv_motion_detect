@@ -9,14 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from config import (
-    CAMERAS, DEFAULT_CAMERA, shutdown_flag, logger
+    CAMERAS, DEFAULT_CAMERA, logger, config
 )
 from roi_manager import ROIManager
 from motion_detector import MotionDetector
 from api_routes import setup_routes
 
 # Global state
-shutdown_flag = False
 detector = None
 shutdown_event = asyncio.Event()
 current_camera_url = CAMERAS[DEFAULT_CAMERA]["url"]
@@ -83,11 +82,11 @@ setup_routes(app, get_detector, get_roi_manager)
 # ===== Signal Handler =====
 def signal_handler(sig, frame):
     """Handle shutdown signals"""
-    global shutdown_flag, detector
-    if shutdown_flag:
+    global  detector
+    if config.shutdown_flag:
         os._exit(1)
     
-    shutdown_flag = True
+    config.shutdown_flag = True
     shutdown_event.set()
     
     print("\n🛑 Shutting down...")
