@@ -1,0 +1,44 @@
+{
+  "Balcony Camera": {
+    "x": 0.3333333333333333,
+    "y": 0.13854699488491048,
+    "width": 0.37164750957854403,
+    "height": 0.329923273657289,
+    "enabled": true
+  },
+  "Kitchen": {
+    "x": 0,
+    "y": 0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false
+  },
+  "Zorayna": {
+    "x": 0,
+    "y": 0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false
+  },
+  "Zlata Quick": {
+    "x": 0,
+    "y": 0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false
+  },
+  "Children Room": {
+    "x": 0,
+    "y": 0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false
+  },
+  "Koridor": {
+    "x": 0,
+    "y": 0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false
+  }
+}
