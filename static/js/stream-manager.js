@@ -53,14 +53,6 @@ class StreamManager {
         // }
         this.stream.src = `/stream.mjpg?time=${Date.now()}`;
     }
-
-    getParams() {
-        return this.currentParams;
-    }
-
-    onStreamLoad(callback) {
-        this.stream.addEventListener('load', callback);
-    }
 }
 
 // Export for use

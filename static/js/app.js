@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const audioPlayer = document.getElementById('audioPlayer');
 
     // State
-    let audioEnabled = true;
     let recordingEnabled = true;
     let detectionEnabled = true;
     let lastMotionState = false;
@@ -149,8 +148,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     motionStatus.className = 'motion-status motion';
                 }
 
+                // Start repeating alert if motion just started
                 if (!lastMotionState) {
-                    playAlert();
+                    window.audioManager.startMotionAlert();
                 }
                 lastMotionState = true;
             } else {
@@ -160,6 +160,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     motionStatus.className = 'motion-status recording';
                 } else {
                     motionStatus.className = 'motion-status';
+                }
+                
+                // Stop repeating alert when motion stops
+                if (lastMotionState) {
+                    window.audioManager.stopMotionAlert();
                 }
                 lastMotionState = false;
             }
@@ -251,32 +256,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function toggleAudio() {
-        audioEnabled = !audioEnabled;
-        audioToggle.textContent = audioEnabled ? '🔊 Audio ON' : '🔇 Audio OFF';
-        audioToggle.className = audioEnabled ? 'btn btn-audio' : 'btn btn-audio off';
+        const audioManager = window.audioManager;
+        const newState = !audioManager.enabled;
+        audioManager.setEnabled(newState);
+        
+        audioToggle.textContent = newState ? '🔊 Audio ON' : '🔇 Audio OFF';
+        audioToggle.className = newState ? 'btn btn-audio' : 'btn btn-audio off';
 
-        if (audioEnabled) {
-            playAlert();
-        }
-    }
-
-    function playAlert() {
-        if (audioEnabled) {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.value = 880;
-                gain.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + 0.15);
-            } catch (e) {
-                console.log('Beep error:', e);
-            }
+        if (newState) {
+            // Test sound
+            audioManager.testSound();
         }
     }
 
@@ -414,8 +403,6 @@ document.addEventListener('DOMContentLoaded', function() {
     roiDraw.addEventListener('click', function() {
         if (roiManager.isDrawingMode) {
             roiManager.disableDrawing();
-            roiDraw.textContent = '✏️ Draw ROI';
-            roiDraw.className = 'btn btn-roi';
         } else {
             roiManager.enableDrawing();
             roiDraw.textContent = '✏️ Drawing... Click to cancel';
@@ -459,6 +446,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update ROI state in UI
         document.getElementById('roiState').textContent = roiData.enabled ? 'Active' : 'Disabled';
     };
+
+    // ===== Cleanup on page unload =====
+    window.addEventListener('beforeunload', function() {
+        window.audioManager.cleanup();
+    });
 
     // ===== Initialization =====
     function initialize() {
@@ -508,6 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('🎥 Motion Detection with ROI initialized');
         console.log('📡 SSE connected:', sseClient.isConnected);
         console.log('📱 Mobile support:', roiManager.isMobile ? 'Enabled' : 'Not detected');
+        console.log('🔊 Audio alerts will play every 3 seconds during motion');
     }
 
     // Start the application

@@ -106,6 +106,8 @@ class ROIManager {
         this.canvas.style.cursor = 'default';
         this.drawStart = null;
         this.drawEnd = null;
+        roiDraw.textContent = '✏️ Draw ROI';
+        roiDraw.className = 'btn btn-roi';        
         this.showHelp('', '');
         this.drawROI();
     }
