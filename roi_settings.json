@@ -1,0 +1,51 @@
+{
+  "Balcony Camera": {
+    "x": 0.4375,
+    "y": 0.46149305555555553,
+    "width": 0.345,
+    "height": 0.33999999999999997,
+    "enabled": true
+  },
+  "Kitchen": {
+    "x": 0.2028368794326241,
+    "y": 0.33019258034026466,
+    "width": 0.2595744680851064,
+    "height": 0.32325141776937616,
+    "enabled": true
+  },
+  "H40": {
+    "x": 0.05221932114882506,
+    "y": 0.07551175958188153,
+    "width": 0.26109660574412535,
+    "height": 0.5191637630662022,
+    "enabled": true
+  },
+  "Hik_vision": {
+    "x": 0,
+    "y": 0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false
+  },
+  "Children Room": {
+    "x": 0,
+    "y": 0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false
+  },
+  "\u0421orridor": {
+    "x": 0,
+    "y": 0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false
+  },
+  "Corridor": {
+    "x": 0,
+    "y": 0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false
+  }
+}

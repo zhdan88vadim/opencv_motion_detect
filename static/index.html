@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Detection with ROI</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>
+            Live Security Feed
+            <span class="status-indicator online" id="statusIndicator"></span>
+            <span id="connectionStatus" style="font-size: 14px; color: #4CAF50;">Connected</span>
+        </h2>
+        
+        <div class="video-container" id="videoContainer">
+            <img id="stream" src="/stream.mjpg?threshold=200&min_area=5" alt="Live Stream">
+            <canvas id="roiCanvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Camera</label>
+                <select id="cameraSelect" style="width: 100%; padding: 8px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #444; border-radius: 4px; cursor: pointer;">
+                    <!-- Options loaded dynamically from API -->
+                </select>
+                <span id="audioIndicator" class="audio-indicator enabled">🔊 Audio available</span>
+            </div>
+            
+            <div class="control-group">
+                <label>Motion Threshold</label>
+                <input type="range" id="threshold" min="10" max="2000" step="10" value="200">
+                <span id="t_val">200</span>
+            </div>
+            
+            <div class="control-group">
+                <label>Minimum Area</label>
+                <input type="range" id="min_area" min="5" max="1000" step="5" value="5">
+                <span id="m_val">5</span>
+            </div>
+        </div>
+        
+        <div class="roi-controls">
+            <button id="roiToggle" class="btn btn-roi">🎯 Enable ROI</button>
+            <button id="roiDraw" class="btn btn-roi">✏️ Draw ROI</button>
+            <button id="roiReset" class="btn btn-roi reset">🔄 Reset ROI</button>
+            <button id="audioToggle" class="btn btn-audio">🔊 Audio ON</button>
+            <button id="recordToggle" class="btn btn-record">📹 Recording ON</button>
+            <button id="detectionToggle" class="btn btn-detection">🎯 Detection ON</button>
+        </div>
+        
+        <div id="helpText" class="help-text">
+            💡 Click and drag on the video to draw ROI rectangle. Release to save.
+        </div>
+        
+        <div id="roiStatus" class="roi-status inactive">📐 ROI: Disabled (Full Frame)</div>
+        <div id="roiCoords" class="roi-coords">ROI Position: —</div>
+        
+        <div id="motionStatus" class="motion-status">⚫ NO MOTION</div>
+        
+        <div class="info-panel">
+            <span class="info-item">📷 Camera: <span class="value" id="currentCamera">Loading...</span></span>
+            <span class="info-item">🎯 ROI: <span class="value" id="roiState">Disabled</span></span>
+            <span class="info-item">📹 Recording: <span class="value" id="recordingState">OFF</span></span>
+        </div>
+        
+        <audio id="audioPlayer" controls autoplay preload="none">
+            <source src="/audio.wav" type="audio/wav">
+        </audio>
+    </div>
+    
+    <!-- JavaScript Modules -->
+    <script src="/static/js/sse-client.js"></script>
+    <script src="/static/js/roi-manager.js"></script>
+    <script src="/static/js/stream-manager.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

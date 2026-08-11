@@ -15,13 +15,14 @@ from video_recorder import VideoRecorder
 from audio_streamer import AudioStreamer
 
 class MotionDetector:
-    def __init__(self, motion_threshold, min_area, rtsp_url, has_audio=True, camera_name="", roi_manager: ROIManager=None):
+    def __init__(self, motion_threshold, min_area, rtsp_url, has_audio=True, camera_name="", roi_manager: ROIManager=None, show_roi_in_right_panel=True):
         self.rtsp_url = rtsp_url
         self.motion_threshold = motion_threshold
         self.min_area = min_area
         self.has_audio = has_audio
         self.camera_name = camera_name or DEFAULT_CAMERA
         self.roi_manager = roi_manager
+        self.show_roi_in_right_panel = show_roi_in_right_panel
         self.cap = None
         self.cap_lock = threading.Lock()
         self._init_capture()
@@ -61,6 +62,10 @@ class MotionDetector:
         self.reconnect_attempts = 0
         self.max_reconnect_attempts = 10
         self.last_reconnect_time = 0
+    
+    def set_show_roi_in_right_panel(self, enabled):
+        """Toggle between showing fg_mask and ROI area in the right panel"""
+        self.show_roi_in_right_panel = enabled
             
     def _init_capture(self):
         """Initialize video capture with retry logic"""
@@ -198,6 +203,72 @@ class MotionDetector:
             print("✅ Video capture restarted")
         else:
             print("⚠️ Failed to restart video capture")
+    
+    def _create_right_panel(self, frame_resized, fg_mask):
+        """Create the right panel based on show_roi_in_right_panel setting"""
+        DISPLAY_WIDTH = 800
+        DISPLAY_HEIGHT = 600
+        
+        if self.show_roi_in_right_panel:
+            # Show ROI area scaled (zoom in on ROI)
+            roi = self.roi_manager.get_roi(self.camera_name)
+            if roi['enabled']:
+                height, width = frame_resized.shape[:2]
+                x = int(roi['x'] * width)
+                y = int(roi['y'] * height)
+                roi_width = int(roi['width'] * width)
+                roi_height = int(roi['height'] * height)
+                
+                # Extract ROI from the original frame
+                roi_area = frame_resized[y:y+roi_height, x:x+roi_width]
+                
+                # Scale ROI to fill the right panel
+                if roi_area.size > 0:
+
+                    if not self.is_motion_detected:
+                        roi_area = cv2.convertScaleAbs(roi_area, alpha=0.3, beta=0)
+
+                    right_panel = cv2.resize(roi_area, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+                    
+                    # Add ROI indicator
+                    cv2.putText(right_panel, "ROI AREA (ZOOMED)", 
+                               (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                    
+                    # Add ROI info
+                    cv2.putText(right_panel, f"Position: ({roi['x']:.2f}, {roi['y']:.2f})", 
+                               (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                    cv2.putText(right_panel, f"Size: {roi['width']:.2f}x{roi['height']:.2f}", 
+                               (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                    
+                    return right_panel
+                else:
+                    # Fallback if ROI extraction fails
+                    placeholder = np.zeros((DISPLAY_HEIGHT, DISPLAY_WIDTH, 3), dtype=np.uint8)
+                    cv2.putText(placeholder, "ROI AREA", 
+                               (200, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (100, 100, 100), 3)
+                    cv2.putText(placeholder, "EMPTY OR INVALID", 
+                               (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100, 100, 100), 2)
+                    return placeholder
+            else:
+                # ROI is disabled
+                placeholder = np.zeros((DISPLAY_HEIGHT, DISPLAY_WIDTH, 3), dtype=np.uint8)
+                cv2.putText(placeholder, "ROI AREA", 
+                           (200, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (100, 100, 100), 3)
+                cv2.putText(placeholder, "ROI DISABLED", 
+                           (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (100, 100, 100), 2)
+                cv2.putText(placeholder, "Enable ROI in settings", 
+                           (150, 340), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (80, 80, 80), 2)
+                return placeholder
+        else:
+            # Show the original fg_mask
+            fg_mask_colored = cv2.cvtColor(fg_mask, cv2.COLOR_GRAY2BGR)
+            right_panel = cv2.resize(fg_mask_colored, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+            
+            # Add label
+            cv2.putText(right_panel, "MOTION MASK", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            
+            return right_panel
     
     def process_frame(self):
         DISPLAY_WIDTH = 800
@@ -367,10 +438,11 @@ class MotionDetector:
                         cv2.rectangle(display_frame, (x, y), (x+roi_width, y+roi_height), (0, 255, 255), 2)
                         cv2.putText(display_frame, "ROI", (x+5, y+25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
                     
-                    fg_mask_colored = cv2.cvtColor(fg_mask, cv2.COLOR_GRAY2BGR)
-                    fg_mask_resized = cv2.resize(fg_mask_colored, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+                    # Create the right panel based on the setting
+                    right_panel = self._create_right_panel(frame_resized, fg_mask)
                     
-                    full_screen_frame = np.hstack((display_frame, fg_mask_resized))
+                    # Combine left and right panels
+                    full_screen_frame = np.hstack((display_frame, right_panel))
                     self.current_frame = full_screen_frame
                     
                     elapsed = time.time() - self.last_update

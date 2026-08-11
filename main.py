@@ -6,65 +6,60 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from config import (
-    CAMERAS, DEFAULT_CAMERA, logger, config
-)
+from config import CAMERAS, DEFAULT_CAMERA, logger, config
 from roi_manager import ROIManager
 from motion_detector import MotionDetector
 from api_routes import setup_routes
-
-# Global state
-detector = None
-shutdown_event = asyncio.Event()
-current_camera_url = CAMERAS[DEFAULT_CAMERA]["url"]
-
-# Создаем ЕДИНСТВЕННЫЙ экземпляр ROI Manager
-roi_manager = ROIManager()
-
-
-# ===== Функции для передачи в api_routes =====
-def get_detector():
-    """Getter for detector instance"""
-    global detector
-    return detector
-
-
-def get_roi_manager():
-    """Getter for ROI manager instance"""
-    global roi_manager
-    return roi_manager
+from app_state import app_state
 
 
 # ===== Lifespan =====
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global detector, current_camera_url
-    
-    default_config = CAMERAS[DEFAULT_CAMERA]
-    current_camera_url = default_config["url"]
-    
-    # Создаем детектор с roi_manager
-    detector = MotionDetector(
-        motion_threshold=200, 
-        min_area=5, 
-        rtsp_url=current_camera_url,
-        has_audio=default_config.get("has_audio", True),
-        camera_name=DEFAULT_CAMERA,
-        roi_manager=roi_manager
-    )
-    detector.start()
-    
-    print("🌐 Server starting with FastAPI")
-    print(f"📷 Default camera: {DEFAULT_CAMERA}")
-    print(f"🔊 Audio: {'Enabled' if default_config.get('has_audio', True) else 'Disabled'}")
-    print(f"📐 ROI Manager: Initialized")
-    yield
-    if detector:
-        detector.stop()
+    # Startup
+    try:
+        default_config = CAMERAS[DEFAULT_CAMERA]
+        app_state.current_camera_url = default_config["url"]
+        
+        # Initialize ROI Manager
+        app_state.roi_manager = ROIManager()
+        
+        # Initialize Detector
+        app_state.detector = MotionDetector(
+            motion_threshold=200,
+            min_area=5,
+            rtsp_url=app_state.current_camera_url,
+            has_audio=default_config.get("has_audio", True),
+            camera_name=DEFAULT_CAMERA,
+            roi_manager=app_state.roi_manager
+        )
+        app_state.detector.start()
 
-app = FastAPI(lifespan=lifespan)
+        
+        logger.info(f"🚀 Server started with camera: {DEFAULT_CAMERA}")
+        logger.info(f"📐 ROI Manager: Initialized")
+        
+        yield
+        
+    except Exception as e:
+        logger.error(f"Startup failed: {e}")
+        raise
+    finally:
+        # Shutdown
+        if app_state.detector:
+            app_state.detector.stop()
+        logger.info("✅ Server shutdown complete")
+
+
+# ===== Create FastAPI App =====
+app = FastAPI(
+    title="Motion Detection API",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 # CORS middleware
 app.add_middleware(
@@ -75,30 +70,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Настраиваем роуты
-setup_routes(app, get_detector, get_roi_manager)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Setup routes - pass app_state instead of individual getters
+setup_routes(app, app_state)
 
 
 # ===== Signal Handler =====
 def signal_handler(sig, frame):
     """Handle shutdown signals"""
-    global  detector
     if config.shutdown_flag:
         os._exit(1)
     
     config.shutdown_flag = True
-    shutdown_event.set()
+    app_state.shutdown_event.set()
     
-    print("\n🛑 Shutting down...")
+    logger.info("🛑 Shutting down...")
     
     def do_shutdown():
-        global detector
-        if detector:
+        if app_state.detector:
             try:
-                detector.stop()
+                app_state.detector.stop()
             except Exception as e:
                 logger.error(f"Error stopping detector: {e}")
-        print("✅ Shutdown complete")
+        logger.info("✅ Shutdown complete")
         os._exit(0)
     
     threading.Thread(target=do_shutdown, daemon=True).start()
@@ -123,5 +118,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         signal_handler(None, None)
     finally:
-        if detector:
-            detector.stop()
+        if app_state.detector:
+            app_state.detector.stop()

@@ -37,7 +37,7 @@ class ConfigManager:
                 "url": "rtsp://192.168.0.102:8554/h2_long_1_wifi_h264",
                 "has_audio": True
             },
-            "Сorridor": {
+            "Corridor": {
                 "url": "rtsp://192.168.0.102:8554/ESP32-CAM_video36",
                 "has_audio": False
             },
