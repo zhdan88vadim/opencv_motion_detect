@@ -3,7 +3,7 @@ import numpy as np
 import time
 import threading
 import json
-import logging
+import queue
 import gc
 import os
 
@@ -45,7 +45,9 @@ class MotionDetector:
         self.motion_cooldown = 0
         self.cooldown_frames = 3
         
-        self.audio_streamer = AudioStreamer(rtsp_url, enable_audio=self.has_audio)
+        # Only create AudioStreamer if audio is enabled
+        self.audio_streamer = AudioStreamer(rtsp_url, enable_audio=self.has_audio) if self.has_audio else None
+        
         self.video_recorder = VideoRecorder(rtsp_url, RECORDINGS_DIR)
         
         # SSE clients
@@ -62,6 +64,10 @@ class MotionDetector:
         self.reconnect_attempts = 0
         self.max_reconnect_attempts = 10
         self.last_reconnect_time = 0
+    
+    def has_audio_available(self) -> bool:
+        """Check if audio is available"""
+        return self.audio_streamer is not None and self.audio_streamer.enable_audio
     
     def set_show_roi_in_right_panel(self, enabled):
         """Toggle between showing fg_mask and ROI area in the right panel"""
@@ -171,7 +177,7 @@ class MotionDetector:
                 'recording': self.video_recorder.recording if self.video_recorder else False,
                 'recording_enabled': config.recording_enable,
                 'detection_enabled': config.detection_enabled,
-                'has_audio': self.has_audio,
+                'has_audio': self.has_audio and self.audio_streamer is not None,
                 'camera_name': self.camera_name,
             }
             if self.video_recorder and self.video_recorder.last_save_path:
@@ -192,7 +198,7 @@ class MotionDetector:
                 'recording': False,
                 'recording_enabled': config.recording_enable,
                 'detection_enabled': config.detection_enabled,
-                'has_audio': self.has_audio,
+                'has_audio': self.has_audio and self.audio_streamer is not None,
                 'camera_name': self.camera_name,
             }
     
@@ -224,10 +230,9 @@ class MotionDetector:
                 
                 # Scale ROI to fill the right panel
                 if roi_area.size > 0:
-
                     if not self.is_motion_detected:
                         roi_area = cv2.convertScaleAbs(roi_area, alpha=0.3, beta=0)
-
+                    
                     right_panel = cv2.resize(roi_area, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
                     
                     # Add ROI indicator
@@ -496,14 +501,14 @@ class MotionDetector:
             self.sse_clients.clear()
         
         # Stop video recorder
-        if hasattr(self, 'video_recorder'):
+        if self.video_recorder:
             try:
                 self.video_recorder.stop()
             except:
                 pass
         
-        # Stop audio streamer
-        if hasattr(self, 'audio_streamer'):
+        # Stop audio streamer only if it exists
+        if self.audio_streamer:
             try:
                 self.audio_streamer.cleanup()
             except:

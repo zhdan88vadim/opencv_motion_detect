@@ -1,4 +1,3 @@
-# api_routes.py
 import os
 import time
 import glob
@@ -140,14 +139,29 @@ def setup_routes(app: FastAPI, state: AppState):
     async def audio_stream():
         """Audio stream endpoint"""
         detector = state.get_detector()
-        if not detector or not hasattr(detector, 'audio_streamer'):
+        
+        if not detector:
             return JSONResponse(
-                {"error": "Audio streamer not available"}, 
-                status_code=500
+                {"error": "Detector not available"}, 
+                status_code=503
+            )
+        
+        # Use the helper method or check directly
+        if not detector.has_audio_available():
+            return JSONResponse(
+                {"error": "Audio not available"}, 
+                status_code=404
             )
         
         streamer = detector.audio_streamer
         audio_queue = streamer.subscribe_client()
+        
+        # Check if we got a dummy queue (audio disabled case)
+        if audio_queue.qsize() > 0 and audio_queue.get_nowait() == b'':
+            return JSONResponse(
+                {"error": "Audio is not available for this camera"}, 
+                status_code=404
+            )
         
         async def generate():
             try:
@@ -180,7 +194,7 @@ def setup_routes(app: FastAPI, state: AppState):
                 "Expires": "0",
             }
         )
-    
+        
     @app.post("/switch_camera")
     async def switch_camera(request: Request):
         """Switch camera - rewrites the detector instance"""
@@ -191,7 +205,10 @@ def setup_routes(app: FastAPI, state: AppState):
             has_audio = data.get('has_audio', True)
             
             if not new_url:
-                return {"status": "error", "message": "No URL provided"}
+                return JSONResponse(
+                    {"status": "error", "message": "No URL provided"},
+                    status_code=400
+                )
             
             # Get current detector
             current_detector = state.get_detector()
@@ -199,10 +216,11 @@ def setup_routes(app: FastAPI, state: AppState):
             # Stop old detector
             if current_detector:
                 current_detector.stop()
-                await asyncio.sleep(2)
-                gc.collect()
+                await asyncio.sleep(0.5)
+                # Let GC happen naturally, or use less aggressive collection
+                gc.collect(1)
             
-            # Create NEW detector instance (THIS REWRITES THE DETECTOR)
+            # Create NEW detector instance
             new_detector = MotionDetector(
                 motion_threshold=200,
                 min_area=5,
@@ -213,14 +231,14 @@ def setup_routes(app: FastAPI, state: AppState):
             )
             new_detector.start()
             
-            # Update state with new detector (THIS IS THE REWRITE)
+            # Update state with new detector
             state.set_detector(new_detector)
             state.current_camera_url = new_url
             
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.5)
             
             logger.info(f"✅ Switched to camera: {camera_name} ({new_url})")
-            return {
+            return JSONResponse({
                 "status": "ok", 
                 "message": f"Switched to {camera_name}",
                 "camera": {
@@ -228,11 +246,14 @@ def setup_routes(app: FastAPI, state: AppState):
                     "url": new_url,
                     "has_audio": has_audio
                 }
-            }
+            })
             
         except Exception as e:
             logger.error(f"Error switching camera: {e}")
-            return {"status": "error", "message": str(e)}
+            return JSONResponse(
+                {"status": "error", "message": str(e)},
+                status_code=500
+            )
     
     @app.post("/toggle_recording")
     async def toggle_recording(request: Request):
@@ -250,13 +271,16 @@ def setup_routes(app: FastAPI, state: AppState):
             
             config.recording_enable = new_state
             logger.info(f"Recording toggled: {'ON' if new_state else 'OFF'}")
-            return {
+            return JSONResponse({
                 "status": "ok", 
                 "recording_enabled": config.recording_enable
-            }
+            })
         except Exception as e:
             logger.error(f"Error toggling recording: {e}")
-            return {"status": "error", "message": str(e)}
+            return JSONResponse(
+                {"status": "error", "message": str(e)},
+                status_code=500
+            )
     
     @app.post("/toggle_detection")
     async def toggle_detection(request: Request):
@@ -266,13 +290,16 @@ def setup_routes(app: FastAPI, state: AppState):
             new_state = data.get('enabled', True)
             config.detection_enabled = new_state
             logger.info(f"Detection toggled: {'ON' if new_state else 'OFF'}")
-            return {
+            return JSONResponse({
                 "status": "ok", 
                 "detection_enabled": config.detection_enabled
-            }
+            })
         except Exception as e:
             logger.error(f"Error toggling detection: {e}")
-            return {"status": "error", "message": str(e)}
+            return JSONResponse(
+                {"status": "error", "message": str(e)},
+                status_code=500
+            )
     
     @app.get("/motion_status")
     async def motion_status():
@@ -280,7 +307,10 @@ def setup_routes(app: FastAPI, state: AppState):
         detector = state.get_detector()
         if detector:
             return detector.get_motion_status()
-        return {"error": "Detector not available"}
+        return JSONResponse(
+            {"error": "Detector not available"},
+            status_code=503
+        )
     
     # ===== ROI API Endpoints =====
     
@@ -289,101 +319,89 @@ def setup_routes(app: FastAPI, state: AppState):
         """Get ROI for specific camera"""
         roi_mgr = state.get_roi_manager()
         if not roi_mgr:
-            return {"status": "error", "message": "ROI Manager not available"}
+            return JSONResponse(
+                {"status": "error", "message": "ROI Manager not available"},
+                status_code=503
+            )
         try:
             roi = roi_mgr.get_roi(camera_name)
-            return {"status": "ok", "camera_name": camera_name, "roi": roi}
+            return JSONResponse({
+                "status": "ok", 
+                "camera_name": camera_name, 
+                "roi": roi
+            })
         except Exception as e:
             logger.error(f"Error getting ROI: {e}")
-            return {"status": "error", "message": str(e)}
+            return JSONResponse(
+                {"status": "error", "message": str(e)},
+                status_code=500
+            )
     
     @app.post("/roi/set")
     async def set_roi(request: CameraROIRequest):
         """Set ROI for specific camera"""
         roi_mgr = state.get_roi_manager()
         if not roi_mgr:
-            return {"status": "error", "message": "ROI Manager not available"}
+            return JSONResponse(
+                {"status": "error", "message": "ROI Manager not available"},
+                status_code=503
+            )
         try:
             roi_dict = request.roi.dict()
             roi_mgr.set_roi(request.camera_name, roi_dict)
-            return {
+            return JSONResponse({
                 "status": "ok",
                 "message": f"ROI set for {request.camera_name}",
                 "camera_name": request.camera_name,
                 "roi": roi_dict
-            }
+            })
         except Exception as e:
             logger.error(f"Error setting ROI: {e}")
-            return {"status": "error", "message": str(e)}
+            return JSONResponse(
+                {"status": "error", "message": str(e)},
+                status_code=500
+            )
     
     @app.post("/roi/reset/{camera_name}")
     async def reset_roi(camera_name: str):
         """Reset ROI for specific camera"""
         roi_mgr = state.get_roi_manager()
         if not roi_mgr:
-            return {"status": "error", "message": "ROI Manager not available"}
+            return JSONResponse(
+                {"status": "error", "message": "ROI Manager not available"},
+                status_code=503
+            )
         try:
             roi_mgr.reset_roi(camera_name)
-            return {
+            return JSONResponse({
                 "status": "ok",
                 "message": f"ROI reset for {camera_name}",
                 "camera_name": camera_name
-            }
+            })
         except Exception as e:
             logger.error(f"Error resetting ROI: {e}")
-            return {"status": "error", "message": str(e)}
+            return JSONResponse(
+                {"status": "error", "message": str(e)},
+                status_code=500
+            )
     
     @app.get("/roi/all")
     async def get_all_rois():
         """Get all ROIs"""
         roi_mgr = state.get_roi_manager()
         if not roi_mgr:
-            return {"status": "error", "message": "ROI Manager not available"}
+            return JSONResponse(
+                {"status": "error", "message": "ROI Manager not available"},
+                status_code=503
+            )
         try:
-            return {"status": "ok", "rois": roi_mgr.rois}
+            return JSONResponse({
+                "status": "ok", 
+                "rois": roi_mgr.rois
+            })
         except Exception as e:
             logger.error(f"Error getting all ROIs: {e}")
-            return {"status": "error", "message": str(e)}
-    
-    @app.get("/recordings")
-    async def list_recordings():
-        """List recent recordings"""
-        try:
-            recordings = []
-            pattern = os.path.join(RECORDINGS_DIR, "motion_*.mp4")
-            files = glob.glob(pattern)
-            files.sort(key=os.path.getctime, reverse=True)
-            
-            for f in files[:50]:
-                recordings.append({
-                    "name": os.path.basename(f),
-                    "size": os.path.getsize(f),
-                    "created": datetime.fromtimestamp(os.path.getctime(f)).isoformat()
-                })
-            
-            return {"recordings": recordings}
-        except Exception as e:
-            logger.error(f"Error listing recordings: {e}")
-            return {"recordings": [], "error": str(e)}
-    
-    @app.get("/health")
-    async def health():
-        """Health check endpoint"""
-        detector = state.get_detector()
-        try:
-            status = {
-                "status": "running",
-                "detector": detector is not None and detector.running,
-                "recording_enabled": config.recording_enable,
-                "detection_enabled": config.detection_enabled,
-                "recordings_count": len(glob.glob(os.path.join(RECORDINGS_DIR, "motion_*.mp4"))),
-            }
-            if detector:
-                status["motion_detected"] = detector.is_motion_detected
-                status["has_audio"] = detector.has_audio
-                status["camera_name"] = detector.camera_name
-                status["camera_url"] = state.current_camera_url
-            return status
-        except Exception as e:
-            logger.error(f"Health check error: {e}")
-            return {"status": "error", "message": str(e)}
+            return JSONResponse(
+                {"status": "error", "message": str(e)},
+                status_code=500
+            )

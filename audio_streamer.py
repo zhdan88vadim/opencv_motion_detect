@@ -3,8 +3,6 @@ import threading
 import subprocess
 import queue
 import struct
-import logging
-import numpy as np
 import select
 
 from config import logger
@@ -18,22 +16,18 @@ class AudioStreamer:
         self.clients = []
         self.clients_lock = threading.Lock()
         self.client_queue_size = 10
-        self.beep_data = self._generate_beep(880, 0.1)
         self.wav_header = self._generate_wav_header()
         self.process = None
         self.enable_audio = enable_audio
+        self.thread = None
         
         if self.enable_audio:
             self.thread = threading.Thread(target=self.capture_audio)
             self.thread.daemon = True
             self.thread.start()
-            print("🎵 AudioStreamer initialized (low-latency mode)")
+            print("🎵 AudioStreamer initialized (audio enabled)")
         else:
-            # Still start thread for fallback beep
-            self.thread = threading.Thread(target=self.capture_audio)
-            self.thread.daemon = True
-            self.thread.start()
-            print("🎵 AudioStreamer initialized (audio disabled, using fallback)")
+            print("🎵 AudioStreamer initialized (audio disabled)")
 
     def _generate_wav_header(self):
         sample_rate = self.sample_rate
@@ -60,18 +54,14 @@ class AudioStreamer:
         )
         return header
 
-    def _generate_beep(self, frequency, duration):
-        try:
-            sample_rate = self.sample_rate
-            t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-            wave = np.sin(frequency * 2 * np.pi * t) * 0.3
-            audio = (wave * 32767).astype(np.int16)
-            return audio.tobytes()
-        except Exception as e:
-            logger.error(f"Error generating beep: {e}")
-            return b'\x00' * 1024
-
     def subscribe_client(self):
+        """Subscribe a client to receive audio"""
+        if not self.enable_audio:
+            # Return a dummy queue that immediately ends
+            dummy_queue = queue.Queue()
+            dummy_queue.put(b'')
+            return dummy_queue
+        
         new_queue = queue.Queue(maxsize=self.client_queue_size)
         with self.clients_lock:
             self.clients.append(new_queue)
@@ -105,15 +95,12 @@ class AudioStreamer:
                         pass
 
     def capture_audio(self):
+        """Capture audio from RTSP stream"""
         if not self.enable_audio:
-            print("[AUDIO] Audio disabled, using fallback beep")
+            print("[AUDIO] Audio disabled, no audio will be streamed")
+            # Keep thread alive but don't do anything
             while self.running:
-                try:
-                    self._broadcast_chunk(self.beep_data)
-                    time.sleep(0.05)
-                except Exception as e:
-                    logger.error(f"Audio fallback error: {e}")
-                    break
+                time.sleep(0.1)
             return
         
         methods = [
@@ -133,14 +120,10 @@ class AudioStreamer:
                 logger.error(f"[AUDIO ERROR] Pipeline {method.__name__} failed: {e}")
                 continue
 
-        print("[AUDIO FALLBACK] Entering live fallback test pattern loop...")
+        # If all methods fail, just keep thread alive
+        print("[AUDIO] All audio capture methods failed, no audio available")
         while self.running:
-            try:
-                self._broadcast_chunk(self.beep_data)
-                time.sleep(0.05)
-            except Exception as e:
-                logger.error(f"Audio fallback error: {e}")
-                break
+            time.sleep(0.1)
 
     def _capture_with_ffmpeg(self):
         cmd = [
@@ -155,7 +138,6 @@ class AudioStreamer:
         ]
         
         try:
-            # Use stderr to check for errors
             self.process = subprocess.Popen(
                 cmd, 
                 stdout=subprocess.PIPE, 
@@ -170,7 +152,7 @@ class AudioStreamer:
                 stderr_output = self.process.stderr.read().decode()
                 if "Invalid data found when processing input" in stderr_output or \
                    "Stream" in stderr_output and "not found" in stderr_output:
-                    print("[AUDIO] No audio stream found, using fallback")
+                    print("[AUDIO] No audio stream found")
                     self.process = None
                     raise Exception("No audio stream available")
 
@@ -210,7 +192,6 @@ class AudioStreamer:
                 self.process = None
         except Exception as e:
             logger.error(f"[AUDIO] FFmpeg process error: {e}")
-            # Continue to next method or fallback
 
     def _capture_with_gstreamer(self):
         cmd = [
@@ -251,6 +232,7 @@ class AudioStreamer:
 
     def cleanup(self):
         self.running = False
+        
         # Kill subprocess
         if self.process:
             try:
@@ -263,6 +245,7 @@ class AudioStreamer:
                     pass
             self.process = None
         
+        # Clear clients
         with self.clients_lock:
             for q in self.clients:
                 try:
@@ -271,6 +254,7 @@ class AudioStreamer:
                     pass
             self.clients.clear()
         
+        # Only join thread if it exists and is alive
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=2)
         print("🎵 AudioStreamer cleaned up")
