@@ -51,6 +51,8 @@ class ConfigManager:
         self.RECORD_AFTER_SECONDS = 3
         self.MIN_RECORD_SECONDS = 3
         self.MAX_RECORD_SECONDS = 300
+        self.DISPLAY_WIDTH = 800
+        self.DISPLAY_HEIGHT = 600
 
         # ROI Settings
         self.ROI_SETTINGS_FILE = "roi_settings.json"
@@ -99,6 +101,8 @@ RECORD_BUFFER_SECONDS = config.RECORD_BUFFER_SECONDS
 RECORD_AFTER_SECONDS = config.RECORD_AFTER_SECONDS
 MIN_RECORD_SECONDS = config.MIN_RECORD_SECONDS
 MAX_RECORD_SECONDS = config.MAX_RECORD_SECONDS
+DISPLAY_WIDTH = config.DISPLAY_WIDTH
+DISPLAY_HEIGHT = config.DISPLAY_HEIGHT
 ROI_SETTINGS_FILE = config.ROI_SETTINGS_FILE
 DEFAULT_ROI = config.DEFAULT_ROI
 logger = logging.getLogger(__name__)                

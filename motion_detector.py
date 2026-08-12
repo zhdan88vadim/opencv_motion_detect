@@ -8,7 +8,7 @@ import gc
 import os
 
 from config import (
-    DEFAULT_CAMERA, RECORDINGS_DIR, logger, config
+    DEFAULT_CAMERA, DISPLAY_HEIGHT, DISPLAY_WIDTH, RECORDINGS_DIR, logger, config
 )
 from roi_manager import ROIManager
 from video_recorder import VideoRecorder
@@ -46,7 +46,7 @@ class MotionDetector:
         self.cooldown_frames = 3
         
         # Only create AudioStreamer if audio is enabled
-        self.audio_streamer = AudioStreamer(rtsp_url, enable_audio=self.has_audio) if self.has_audio else None
+        self.audio_streamer = AudioStreamer(rtsp_url) if self.has_audio else None
         
         self.video_recorder = VideoRecorder(rtsp_url, RECORDINGS_DIR)
         
@@ -168,39 +168,18 @@ class MotionDetector:
             self.min_area = min_area
     
     def get_motion_status(self):
-        try:
-            status = {
-                'motion_detected': self.is_motion_detected,
-                'motion_area': self.total_motion_area,
-                'threshold': self.motion_threshold,
-                'min_area': self.min_area,
-                'recording': self.video_recorder.recording if self.video_recorder else False,
-                'recording_enabled': config.recording_enable,
-                'detection_enabled': config.detection_enabled,
-                'has_audio': self.has_audio and self.audio_streamer is not None,
-                'camera_name': self.camera_name,
-            }
-            if self.video_recorder and self.video_recorder.last_save_path:
-                status['last_recording'] = os.path.basename(self.video_recorder.last_save_path)
-            
-            # Add ROI info
-            roi = self.roi_manager.get_roi(self.camera_name)
-            status['roi'] = roi
-            
-            return status
-        except Exception as e:
-            logger.error(f"Error getting motion status: {e}")
-            return {
-                'motion_detected': False,
-                'motion_area': 0,
-                'threshold': self.motion_threshold,
-                'min_area': self.min_area,
-                'recording': False,
-                'recording_enabled': config.recording_enable,
-                'detection_enabled': config.detection_enabled,
-                'has_audio': self.has_audio and self.audio_streamer is not None,
-                'camera_name': self.camera_name,
-            }
+        return {
+            'motion_detected': self.is_motion_detected,
+            'motion_area': self.total_motion_area,
+            'threshold': self.motion_threshold,
+            'min_area': self.min_area,
+            'recording': self.video_recorder.recording if self.video_recorder else False,
+            'recording_enabled': config.recording_enable,
+            'detection_enabled': config.detection_enabled,
+            'has_audio': self.has_audio and self.audio_streamer is not None,
+            'camera_name': self.camera_name,
+            'roi': self.roi_manager.get_roi(self.camera_name) if self.roi_manager else None
+        }
     
     def restart_capture(self):
         print("🔄 Restarting video capture...")
@@ -212,8 +191,6 @@ class MotionDetector:
     
     def _create_right_panel(self, frame_resized, fg_mask):
         """Create the right panel based on show_roi_in_right_panel setting"""
-        DISPLAY_WIDTH = 800
-        DISPLAY_HEIGHT = 600
         
         if self.show_roi_in_right_panel:
             # Show ROI area scaled (zoom in on ROI)
@@ -276,8 +253,6 @@ class MotionDetector:
             return right_panel
     
     def process_frame(self):
-        DISPLAY_WIDTH = 800
-        DISPLAY_HEIGHT = 600
         detection_was_disabled = True
         frame_timeout_counter = 0
         MAX_TIMEOUTS = 5

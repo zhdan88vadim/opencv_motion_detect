@@ -156,13 +156,6 @@ def setup_routes(app: FastAPI, state: AppState):
         streamer = detector.audio_streamer
         audio_queue = streamer.subscribe_client()
         
-        # Check if we got a dummy queue (audio disabled case)
-        if audio_queue.qsize() > 0 and audio_queue.get_nowait() == b'':
-            return JSONResponse(
-                {"error": "Audio is not available for this camera"}, 
-                status_code=404
-            )
-        
         async def generate():
             try:
                 yield streamer.wav_header

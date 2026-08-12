@@ -8,7 +8,7 @@ import select
 from config import logger
 
 class AudioStreamer:
-    def __init__(self, rtsp_url, enable_audio=True):
+    def __init__(self, rtsp_url):
         self.rtsp_url = rtsp_url
         self.running = True
         self.sample_rate = 44100
@@ -18,16 +18,11 @@ class AudioStreamer:
         self.client_queue_size = 10
         self.wav_header = self._generate_wav_header()
         self.process = None
-        self.enable_audio = enable_audio
-        self.thread = None
-        
-        if self.enable_audio:
-            self.thread = threading.Thread(target=self.capture_audio)
-            self.thread.daemon = True
-            self.thread.start()
-            print("🎵 AudioStreamer initialized (audio enabled)")
-        else:
-            print("🎵 AudioStreamer initialized (audio disabled)")
+
+        self.thread = threading.Thread(target=self.capture_audio)
+        self.thread.daemon = True
+        self.thread.start()
+
 
     def _generate_wav_header(self):
         sample_rate = self.sample_rate
@@ -56,12 +51,7 @@ class AudioStreamer:
 
     def subscribe_client(self):
         """Subscribe a client to receive audio"""
-        if not self.enable_audio:
-            # Return a dummy queue that immediately ends
-            dummy_queue = queue.Queue()
-            dummy_queue.put(b'')
-            return dummy_queue
-        
+
         new_queue = queue.Queue(maxsize=self.client_queue_size)
         with self.clients_lock:
             self.clients.append(new_queue)
@@ -96,16 +86,10 @@ class AudioStreamer:
 
     def capture_audio(self):
         """Capture audio from RTSP stream"""
-        if not self.enable_audio:
-            print("[AUDIO] Audio disabled, no audio will be streamed")
-            # Keep thread alive but don't do anything
-            while self.running:
-                time.sleep(0.1)
-            return
-        
+
         methods = [
             self._capture_with_ffmpeg,
-            self._capture_with_gstreamer,
+            # self._capture_with_gstreamer,
         ]
         
         for method in methods:
@@ -193,42 +177,42 @@ class AudioStreamer:
         except Exception as e:
             logger.error(f"[AUDIO] FFmpeg process error: {e}")
 
-    def _capture_with_gstreamer(self):
-        cmd = [
-            "gst-launch-1.0",
-            "rtspsrc", f"location={self.rtsp_url}", "protocols=tcp",
-            "!", "decodebin",
-            "!", "audioconvert",
-            "!", "audioresample",
-            "!", "audio/x-raw,format=S16LE,rate=44100,channels=1",
-            "!", "fdsink"
-        ]
-        try:
-            self.process = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0
-            )
-            while self.running:
-                try:
-                    data = self.process.stdout.read(256)
-                    if not data:
-                        break
-                    self._broadcast_chunk(data)
-                except (BrokenPipeError, ConnectionResetError, OSError):
-                    print("[AUDIO] Client disconnected, continuing...")
-                    break
-                except Exception as e:
-                    logger.error(f"[AUDIO] Error reading from GStreamer: {e}")
-                    break
+    # def _capture_with_gstreamer(self):
+    #     cmd = [
+    #         "gst-launch-1.0",
+    #         "rtspsrc", f"location={self.rtsp_url}", "protocols=tcp",
+    #         "!", "decodebin",
+    #         "!", "audioconvert",
+    #         "!", "audioresample",
+    #         "!", "audio/x-raw,format=S16LE,rate=44100,channels=1",
+    #         "!", "fdsink"
+    #     ]
+    #     try:
+    #         self.process = subprocess.Popen(
+    #             cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0
+    #         )
+    #         while self.running:
+    #             try:
+    #                 data = self.process.stdout.read(256)
+    #                 if not data:
+    #                     break
+    #                 self._broadcast_chunk(data)
+    #             except (BrokenPipeError, ConnectionResetError, OSError):
+    #                 print("[AUDIO] Client disconnected, continuing...")
+    #                 break
+    #             except Exception as e:
+    #                 logger.error(f"[AUDIO] Error reading from GStreamer: {e}")
+    #                 break
                     
-            if self.process:
-                self.process.terminate()
-                try:
-                    self.process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    self.process.kill()
-                self.process = None
-        except Exception as e:
-            logger.error(f"[AUDIO] GStreamer process error: {e}")
+    #         if self.process:
+    #             self.process.terminate()
+    #             try:
+    #                 self.process.wait(timeout=2)
+    #             except subprocess.TimeoutExpired:
+    #                 self.process.kill()
+    #             self.process = None
+    #     except Exception as e:
+    #         logger.error(f"[AUDIO] GStreamer process error: {e}")
 
     def cleanup(self):
         self.running = False
