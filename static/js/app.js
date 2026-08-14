@@ -29,15 +29,11 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('/api/cameras')
             .then(res => res.json())
             .then(data => {
-                if (data.status === 'ok') {
-                    populateCameraSelect(data.cameras);
-                    // Set default selected camera
-                    const defaultCamera = data.selected || Object.keys(data.cameras)[0];
-                    if (defaultCamera) {
-                        selectCamera(defaultCamera, false);
-                    }
-                } else {
-                    console.error('Failed to load cameras:', data.message);
+                populateCameraSelect(data.cameras);
+                // Set default selected camera
+                const defaultCamera = data.selected || Object.keys(data.cameras)[0];
+                if (defaultCamera) {
+                    selectCamera(defaultCamera, false);
                 }
             })
             .catch(err => {
@@ -98,21 +94,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const data = await res.json();
-            if (data.status === 'ok') {
-                console.log('📷 Switched to camera:', name, 'Audio:', hasAudio);
-                
-                // Update stream with new camera
-                streamManager.setCamera(url);
-                
-                // Update ROI manager
-                roiManager.setCameraName(cameraName);
-                await roiManager.loadROI(cameraName);
-                
-                showNotification('Switched to: ' + name + (hasAudio ? ' 🔊' : ' 🔇'));
-            } else {
-                console.error('Switch camera failed:', data.message);
-                showNotification('❌ Failed to switch camera: ' + data.message);
-            }
+            console.log('📷 Switched to camera:', name, 'Audio:', hasAudio);
+            
+            // Update stream with new camera
+            streamManager.setCamera(url);
+            
+            // Update ROI manager
+            roiManager.setCameraName(cameraName);
+            await roiManager.loadROI(cameraName);
+            
+            showNotification('Switched to: ' + name + (hasAudio ? ' 🔊' : ' 🔇'));
         } catch (e) {
             console.error('Error switching camera:', e);
             showNotification('❌ Error switching camera');

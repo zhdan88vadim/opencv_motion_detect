@@ -37,13 +37,10 @@ class ROIManager {
         return fetch(`/roi/${encodeURIComponent(this.cameraName)}`)
             .then(res => res.json())
             .then(data => {
-                if (data.status === 'ok') {
-                    this.roiData = data.roi;
-                    this.drawROI();
-                    this.updateStatus();
-                    return this.roiData;
-                }
-                throw new Error('Failed to load ROI');
+                this.roiData = data.roi;
+                this.drawROI();
+                this.updateStatus();
+                return this.roiData;
             })
             .catch(err => {
                 console.error('Error loading ROI:', err);
@@ -62,12 +59,9 @@ class ROIManager {
         })
         .then(res => res.json())
         .then(data => {
-            if (data.status === 'ok') {
-                this.drawROI();
-                this.updateStatus();
-                return data;
-            }
-            throw new Error(data.message || 'Failed to save ROI');
+            this.drawROI();
+            this.updateStatus();
+            return data;
         });
     }
 
@@ -77,13 +71,10 @@ class ROIManager {
         })
         .then(res => res.json())
         .then(data => {
-            if (data.status === 'ok') {
-                this.roiData = { x: 0, y: 0, width: 1.0, height: 1.0, enabled: false };
-                this.drawROI();
-                this.updateStatus();
-                return data;
-            }
-            throw new Error(data.message || 'Failed to reset ROI');
+            this.roiData = { x: 0, y: 0, width: 1.0, height: 1.0, enabled: false };
+            this.drawROI();
+            this.updateStatus();
+            return data;
         });
     }
 

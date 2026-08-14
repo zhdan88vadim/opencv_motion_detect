@@ -1,4 +1,3 @@
-# app_state.py
 import asyncio
 from typing import Optional
 from dataclasses import dataclass, field
@@ -18,7 +17,7 @@ class AppState:
         """Get current detector instance"""
         return self.detector
     
-    def set_detector(self, detector: MotionDetector):
+    def set_detector(self, detector: MotionDetector) -> None:
         """Update detector instance"""
         self.detector = detector
     
@@ -26,7 +25,7 @@ class AppState:
         """Get current ROI manager"""
         return self.roi_manager
     
-    def set_roi_manager(self, roi_manager: ROIManager):
+    def set_roi_manager(self, roi_manager: ROIManager) -> None:
         """Update ROI manager"""
         self.roi_manager = roi_manager
 

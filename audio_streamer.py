@@ -4,34 +4,34 @@ import subprocess
 import queue
 import struct
 import select
+from typing import Optional, List, Any
 
 from config import logger
 
-class AudioStreamer:
-    def __init__(self, rtsp_url):
-        self.rtsp_url = rtsp_url
-        self.running = True
-        self.sample_rate = 44100
-        self.channels = 1
-        self.clients = []
-        self.clients_lock = threading.Lock()
-        self.client_queue_size = 10
-        self.wav_header = self._generate_wav_header()
-        self.process = None
 
-        self.thread = threading.Thread(target=self.capture_audio)
+class AudioStreamer:
+    def __init__(self, rtsp_url: str) -> None:
+        self.rtsp_url: str = rtsp_url
+        self.running: bool = True
+        self.sample_rate: int = 44100
+        self.channels: int = 1
+        self.clients: List[queue.Queue] = []
+        self.clients_lock: threading.Lock = threading.Lock()
+        self.client_queue_size: int = 10
+        self.wav_header: bytes = self._generate_wav_header()
+        self.process: Optional[subprocess.Popen] = None
+        self.thread: threading.Thread = threading.Thread(target=self.capture_audio)
         self.thread.daemon = True
         self.thread.start()
 
-
-    def _generate_wav_header(self):
+    def _generate_wav_header(self) -> bytes:
         sample_rate = self.sample_rate
         channels = self.channels
-        bits_per_sample = 16
-        byte_rate = sample_rate * channels * bits_per_sample // 8
-        block_align = channels * bits_per_sample // 8
+        bits_per_sample: int = 16
+        byte_rate: int = sample_rate * channels * bits_per_sample // 8
+        block_align: int = channels * bits_per_sample // 8
 
-        header = struct.pack(
+        header: bytes = struct.pack(
             "<4sI4s4sIHHIIHH4sI",
             b"RIFF",
             0xFFFFFFFF,
@@ -49,23 +49,22 @@ class AudioStreamer:
         )
         return header
 
-    def subscribe_client(self):
+    def subscribe_client(self) -> queue.Queue:
         """Subscribe a client to receive audio"""
-
-        new_queue = queue.Queue(maxsize=self.client_queue_size)
+        new_queue: queue.Queue = queue.Queue(maxsize=self.client_queue_size)
         with self.clients_lock:
             self.clients.append(new_queue)
         return new_queue
 
-    def unsubscribe_client(self, client_queue):
+    def unsubscribe_client(self, client_queue: queue.Queue) -> None:
         with self.clients_lock:
             if client_queue in self.clients:
                 self.clients.remove(client_queue)
 
-    def _broadcast_chunk(self, data):
+    def _broadcast_chunk(self, data: bytes) -> None:
         """Broadcasts raw PCM audio chunks safely to all registered client streams."""
         with self.clients_lock:
-            disconnected = []
+            disconnected: List[queue.Queue] = []
             for client_queue in self.clients:
                 try:
                     if client_queue.full():
@@ -84,12 +83,10 @@ class AudioStreamer:
                     except ValueError:
                         pass
 
-    def capture_audio(self):
+    def capture_audio(self) -> None:
         """Capture audio from RTSP stream"""
-
-        methods = [
+        methods: List[Any] = [
             self._capture_with_ffmpeg,
-            # self._capture_with_gstreamer,
         ]
         
         for method in methods:
@@ -109,8 +106,8 @@ class AudioStreamer:
         while self.running:
             time.sleep(0.1)
 
-    def _capture_with_ffmpeg(self):
-        cmd = [
+    def _capture_with_ffmpeg(self) -> None:
+        cmd: List[str] = [
             "ffmpeg", "-loglevel", "error", "-rtsp_transport", "tcp",
             "-i", self.rtsp_url,
             "-vn",
@@ -133,25 +130,26 @@ class AudioStreamer:
             time.sleep(0.5)
             if self.process.poll() is not None:
                 # Process exited immediately - likely no audio
-                stderr_output = self.process.stderr.read().decode()
-                if "Invalid data found when processing input" in stderr_output or \
-                   "Stream" in stderr_output and "not found" in stderr_output:
-                    print("[AUDIO] No audio stream found")
-                    self.process = None
-                    raise Exception("No audio stream available")
+                if self.process.stderr:
+                    stderr_output: str = self.process.stderr.read().decode()
+                    if "Invalid data found when processing input" in stderr_output or \
+                    "Stream" in stderr_output and "not found" in stderr_output:
+                        print("[AUDIO] No audio stream found")
+                        self.process = None
+                        raise Exception("No audio stream available")
 
-            while self.running:
+            while self.running and self.process is not None:
                 try:
                     # Check if process is still running
-                    if self.process and self.process.poll() is not None:
+                    if self.process.poll() is not None:
                         print("[AUDIO] FFmpeg process ended")
                         break
                     
-                    # Read audio data
-                    if self.process:
+                    # Read audio data - properly handle stdout
+                    if self.process.stdout is not None:
                         rlist, _, _ = select.select([self.process.stdout], [], [], 0.1)
-                        if rlist:
-                            data = self.process.stdout.read(256)
+                        if rlist and self.process.stdout is not None:
+                            data: Optional[bytes] = self.process.stdout.read(256)
                             if data:
                                 self._broadcast_chunk(data)
                             else:
@@ -177,44 +175,7 @@ class AudioStreamer:
         except Exception as e:
             logger.error(f"[AUDIO] FFmpeg process error: {e}")
 
-    # def _capture_with_gstreamer(self):
-    #     cmd = [
-    #         "gst-launch-1.0",
-    #         "rtspsrc", f"location={self.rtsp_url}", "protocols=tcp",
-    #         "!", "decodebin",
-    #         "!", "audioconvert",
-    #         "!", "audioresample",
-    #         "!", "audio/x-raw,format=S16LE,rate=44100,channels=1",
-    #         "!", "fdsink"
-    #     ]
-    #     try:
-    #         self.process = subprocess.Popen(
-    #             cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0
-    #         )
-    #         while self.running:
-    #             try:
-    #                 data = self.process.stdout.read(256)
-    #                 if not data:
-    #                     break
-    #                 self._broadcast_chunk(data)
-    #             except (BrokenPipeError, ConnectionResetError, OSError):
-    #                 print("[AUDIO] Client disconnected, continuing...")
-    #                 break
-    #             except Exception as e:
-    #                 logger.error(f"[AUDIO] Error reading from GStreamer: {e}")
-    #                 break
-                    
-    #         if self.process:
-    #             self.process.terminate()
-    #             try:
-    #                 self.process.wait(timeout=2)
-    #             except subprocess.TimeoutExpired:
-    #                 self.process.kill()
-    #             self.process = None
-    #     except Exception as e:
-    #         logger.error(f"[AUDIO] GStreamer process error: {e}")
-
-    def cleanup(self):
+    def cleanup(self) -> None:
         self.running = False
         
         # Kill subprocess

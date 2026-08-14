@@ -3,6 +3,7 @@ import signal
 import threading
 import asyncio
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Optional, Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,31 +17,26 @@ from api_routes import setup_routes
 from app_state import app_state
 
 
-# ===== Lifespan =====
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         default_config = CAMERAS[DEFAULT_CAMERA]
-        app_state.current_camera_url = default_config["url"]
+        app_state.current_camera_url = str(default_config["url"])
         
-        # Initialize ROI Manager
-        app_state.roi_manager = ROIManager()
+        app_state.set_roi_manager(ROIManager())
         
-        # Initialize Detector
         app_state.detector = MotionDetector(
             motion_threshold=200,
             min_area=5,
             rtsp_url=app_state.current_camera_url,
-            has_audio=default_config.get("has_audio", True),
+            has_audio=bool(default_config.get("has_audio", False)),
             camera_name=DEFAULT_CAMERA,
             roi_manager=app_state.roi_manager
         )
         app_state.detector.start()
-
         
         logger.info(f"🚀 Server started with camera: {DEFAULT_CAMERA}")
-        logger.info(f"📐 ROI Manager: Initialized")
+        logger.info(f"ROI Manager: Initialized")
         
         yield
         
@@ -48,20 +44,17 @@ async def lifespan(app: FastAPI):
         logger.error(f"Startup failed: {e}")
         raise
     finally:
-        # Shutdown
         if app_state.detector:
             app_state.detector.stop()
         logger.info("✅ Server shutdown complete")
 
 
-# ===== Create FastAPI App =====
-app = FastAPI(
+app: FastAPI = FastAPI(
     title="Motion Detection API",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -72,13 +65,10 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Setup routes - pass app_state instead of individual getters
 setup_routes(app, app_state)
 
 
-# ===== Signal Handler =====
-def signal_handler(sig, frame):
-    """Handle shutdown signals"""
+def signal_handler(sig: Optional[int], frame: Optional[Any]) -> None:
     if config.shutdown_flag:
         os._exit(1)
     
@@ -87,7 +77,7 @@ def signal_handler(sig, frame):
     
     logger.info("🛑 Shutting down...")
     
-    def do_shutdown():
+    def do_shutdown() -> None:
         if app_state.detector:
             try:
                 app_state.detector.stop()

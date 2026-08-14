@@ -1,4 +1,6 @@
 import cv2
+import asyncio
+from models import ROISettings
 import numpy as np
 import time
 import threading
@@ -6,6 +8,7 @@ import json
 import queue
 import gc
 import os
+from typing import Optional, List, Dict, Any, Tuple, Union
 
 from config import (
     DEFAULT_CAMERA, DISPLAY_HEIGHT, DISPLAY_WIDTH, RECORDINGS_DIR, logger, config
@@ -14,66 +17,74 @@ from roi_manager import ROIManager
 from video_recorder import VideoRecorder
 from audio_streamer import AudioStreamer
 
+
 class MotionDetector:
-    def __init__(self, motion_threshold, min_area, rtsp_url, has_audio=True, camera_name="", roi_manager: ROIManager=None, show_roi_in_right_panel=True):
-        self.rtsp_url = rtsp_url
-        self.motion_threshold = motion_threshold
-        self.min_area = min_area
-        self.has_audio = has_audio
-        self.camera_name = camera_name or DEFAULT_CAMERA
-        self.roi_manager = roi_manager
-        self.show_roi_in_right_panel = show_roi_in_right_panel
-        self.cap = None
-        self.cap_lock = threading.Lock()
+    def __init__(
+        self, 
+        motion_threshold: int, 
+        min_area: int, 
+        rtsp_url: str, 
+        has_audio: bool = True, 
+        camera_name: str = "", 
+        roi_manager: Optional[ROIManager] = None, 
+        show_roi_in_right_panel: bool = True
+    ) -> None:
+        self.rtsp_url: str = rtsp_url
+        self.motion_threshold: int = motion_threshold
+        self.min_area: int = min_area
+        self.has_audio: bool = has_audio
+        self.camera_name: str = camera_name or DEFAULT_CAMERA
+        self.roi_manager: Optional[ROIManager] = roi_manager
+        self.show_roi_in_right_panel: bool = show_roi_in_right_panel
+        self.cap: Optional[cv2.VideoCapture] = None
+        self.cap_lock: threading.Lock = threading.Lock()
         self._init_capture()
         
-        self.mog2 = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=70, detectShadows=True)
-        self.frame_skip = 10
-        self.frame_count = 0
-        self.target_fps = 5
-        self.current_frame = None
-        self.running = True
-        self.last_update = time.time()
+        self.mog2: cv2.BackgroundSubtractorMOG2 = cv2.createBackgroundSubtractorMOG2(
+            history=500, varThreshold=70, detectShadows=True
+        )
+        self.frame_skip: int = 10
+        self.frame_count: int = 0
+        self.target_fps: int = 5
+        self.current_frame: Optional[np.ndarray] = None
+        self.running: bool = True
+        self.last_update: float = time.time()
         
-        self.lock = threading.Lock()
-        self.frame_processing = False
-        self.thread = None
-        self.stopped = False
+        self.lock: threading.Lock = threading.Lock()
+        self.frame_processing: bool = False
+        self.thread: Optional[threading.Thread] = None
+        self.stopped: bool = False
         
-        self.total_motion_area = 0
-        self.is_motion_detected = False
-        self.motion_cooldown = 0
-        self.cooldown_frames = 3
+        self.total_motion_area: float = 0
+        self.is_motion_detected: bool = False
+        self.motion_cooldown: int = 0
+        self.cooldown_frames: int = 3
         
         # Only create AudioStreamer if audio is enabled
-        self.audio_streamer = AudioStreamer(rtsp_url) if self.has_audio else None
+        self.audio_streamer: Optional[AudioStreamer] = AudioStreamer(rtsp_url) if self.has_audio else None
         
-        self.video_recorder = VideoRecorder(rtsp_url, RECORDINGS_DIR)
+        self.video_recorder: VideoRecorder = VideoRecorder(rtsp_url, RECORDINGS_DIR)
         
         # SSE clients
-        self.sse_clients = []
-        self.sse_lock = threading.Lock()
-        self.sse_running = True
+        self.sse_clients: List[asyncio.Queue] = []
+        self.sse_lock: threading.Lock = threading.Lock()
+        self.sse_running: bool = True
         
         # Start status broadcaster
-        self.status_thread = threading.Thread(target=self._broadcast_status)
+        self.status_thread: threading.Thread = threading.Thread(target=self._broadcast_status)
         self.status_thread.daemon = True
         self.status_thread.start()
         
         # Counter for reconnection attempts
-        self.reconnect_attempts = 0
-        self.max_reconnect_attempts = 10
-        self.last_reconnect_time = 0
+        self.reconnect_attempts: int = 0
+        self.max_reconnect_attempts: int = 10
+        self.last_reconnect_time: float = 0
     
-    def has_audio_available(self) -> bool:
-        """Check if audio is available"""
-        return self.audio_streamer is not None and self.audio_streamer.enable_audio
-    
-    def set_show_roi_in_right_panel(self, enabled):
+    def set_show_roi_in_right_panel(self, enabled: bool) -> None:
         """Toggle between showing fg_mask and ROI area in the right panel"""
         self.show_roi_in_right_panel = enabled
             
-    def _init_capture(self):
+    def _init_capture(self) -> bool:
         """Initialize video capture with retry logic"""
         with self.cap_lock:
             if self.cap is not None:
@@ -120,15 +131,15 @@ class MotionDetector:
             print("❌ Failed to initialize VideoCapture after all attempts")
             return False
     
-    def _broadcast_status(self):
-        last_status = None
+    def _broadcast_status(self) -> None:
+        last_status: Optional[Dict[str, Any]] = None
         while self.sse_running and self.running and not config.shutdown_flag:
             try:
                 status = self.get_motion_status()
                 if status != last_status:
                     data = json.dumps(status)
                     with self.sse_lock:
-                        disconnected = []
+                        disconnected: List[asyncio.Queue] = []
                         for client_queue in self.sse_clients:
                             try:
                                 client_queue.put_nowait(data)
@@ -149,11 +160,11 @@ class MotionDetector:
                 logger.error(f"SSE broadcast error: {e}")
                 time.sleep(0.5)
     
-    def add_sse_client(self, queue):
+    def add_sse_client(self, queue: asyncio.Queue) -> None:
         with self.sse_lock:
             self.sse_clients.append(queue)
     
-    def remove_sse_client(self, queue):
+    def remove_sse_client(self, queue: asyncio.Queue) -> None:
         with self.sse_lock:
             if queue in self.sse_clients:
                 try:
@@ -161,13 +172,13 @@ class MotionDetector:
                 except ValueError:
                     pass
     
-    def update_params(self, motion_threshold=None, min_area=None):
+    def update_params(self, motion_threshold: Optional[int] = None, min_area: Optional[int] = None) -> None:
         if motion_threshold is not None:
             self.motion_threshold = motion_threshold
         if min_area is not None:
             self.min_area = min_area
     
-    def get_motion_status(self):
+    def get_motion_status(self) -> Dict[str, Any]:
         return {
             'motion_detected': self.is_motion_detected,
             'motion_area': self.total_motion_area,
@@ -178,69 +189,70 @@ class MotionDetector:
             'detection_enabled': config.detection_enabled,
             'has_audio': self.has_audio and self.audio_streamer is not None,
             'camera_name': self.camera_name,
-            'roi': self.roi_manager.get_roi(self.camera_name) if self.roi_manager else None
+            # 'roi': self.roi_manager.get_roi(self.camera_name) if self.roi_manager else None
         }
     
-    def restart_capture(self):
+    def restart_capture(self) -> None:
         print("🔄 Restarting video capture...")
         self._init_capture()
         if self.cap is not None and self.cap.isOpened():
             print("✅ Video capture restarted")
         else:
             print("⚠️ Failed to restart video capture")
-    
-    def _create_right_panel(self, frame_resized, fg_mask):
+        
+    def _create_right_panel(self, frame_resized: np.ndarray, fg_mask: np.ndarray) -> np.ndarray:
         """Create the right panel based on show_roi_in_right_panel setting"""
         
         if self.show_roi_in_right_panel:
             # Show ROI area scaled (zoom in on ROI)
-            roi = self.roi_manager.get_roi(self.camera_name)
-            if roi['enabled']:
-                height, width = frame_resized.shape[:2]
-                x = int(roi['x'] * width)
-                y = int(roi['y'] * height)
-                roi_width = int(roi['width'] * width)
-                roi_height = int(roi['height'] * height)
-                
-                # Extract ROI from the original frame
-                roi_area = frame_resized[y:y+roi_height, x:x+roi_width]
-                
-                # Scale ROI to fill the right panel
-                if roi_area.size > 0:
-                    if not self.is_motion_detected:
-                        roi_area = cv2.convertScaleAbs(roi_area, alpha=0.3, beta=0)
+            if self.roi_manager:
+                roi: ROISettings = self.roi_manager.get_roi(self.camera_name)
+                if roi.enabled:  # Use attribute access, not dict
+                    height, width = frame_resized.shape[:2]
+                    x = int(roi.x * width)
+                    y = int(roi.y * height)
+                    roi_width = int(roi.width * width)
+                    roi_height = int(roi.height * height)
                     
-                    right_panel = cv2.resize(roi_area, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+                    # Extract ROI from the original frame
+                    roi_area = frame_resized[y:y+roi_height, x:x+roi_width]
                     
-                    # Add ROI indicator
-                    cv2.putText(right_panel, "ROI AREA (ZOOMED)", 
-                               (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-                    
-                    # Add ROI info
-                    cv2.putText(right_panel, f"Position: ({roi['x']:.2f}, {roi['y']:.2f})", 
-                               (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
-                    cv2.putText(right_panel, f"Size: {roi['width']:.2f}x{roi['height']:.2f}", 
-                               (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
-                    
-                    return right_panel
+                    # Scale ROI to fill the right panel
+                    if roi_area.size > 0:
+                        if not self.is_motion_detected:
+                            roi_area = cv2.convertScaleAbs(roi_area, alpha=0.3, beta=0)
+                        
+                        right_panel = cv2.resize(roi_area, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+                        
+                        # Add ROI indicator
+                        cv2.putText(right_panel, "ROI AREA (ZOOMED)", 
+                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                        
+                        # Add ROI info
+                        cv2.putText(right_panel, f"Position: ({roi.x:.2f}, {roi.y:.2f})", 
+                                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                        cv2.putText(right_panel, f"Size: {roi.width:.2f}x{roi.height:.2f}", 
+                                (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                        
+                        return right_panel
+                    else:
+                        # Fallback if ROI extraction fails
+                        placeholder = np.zeros((DISPLAY_HEIGHT, DISPLAY_WIDTH, 3), dtype=np.uint8)
+                        cv2.putText(placeholder, "ROI AREA", 
+                                (200, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (100, 100, 100), 3)
+                        cv2.putText(placeholder, "EMPTY OR INVALID", 
+                                (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100, 100, 100), 2)
+                        return placeholder
                 else:
-                    # Fallback if ROI extraction fails
+                    # ROI is disabled
                     placeholder = np.zeros((DISPLAY_HEIGHT, DISPLAY_WIDTH, 3), dtype=np.uint8)
                     cv2.putText(placeholder, "ROI AREA", 
-                               (200, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (100, 100, 100), 3)
-                    cv2.putText(placeholder, "EMPTY OR INVALID", 
-                               (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100, 100, 100), 2)
+                            (200, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (100, 100, 100), 3)
+                    cv2.putText(placeholder, "ROI DISABLED", 
+                            (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (100, 100, 100), 2)
+                    cv2.putText(placeholder, "Enable ROI in settings", 
+                            (150, 340), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (80, 80, 80), 2)
                     return placeholder
-            else:
-                # ROI is disabled
-                placeholder = np.zeros((DISPLAY_HEIGHT, DISPLAY_WIDTH, 3), dtype=np.uint8)
-                cv2.putText(placeholder, "ROI AREA", 
-                           (200, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (100, 100, 100), 3)
-                cv2.putText(placeholder, "ROI DISABLED", 
-                           (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (100, 100, 100), 2)
-                cv2.putText(placeholder, "Enable ROI in settings", 
-                           (150, 340), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (80, 80, 80), 2)
-                return placeholder
         else:
             # Show the original fg_mask
             fg_mask_colored = cv2.cvtColor(fg_mask, cv2.COLOR_GRAY2BGR)
@@ -248,11 +260,11 @@ class MotionDetector:
             
             # Add label
             cv2.putText(right_panel, "MOTION MASK", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
             return right_panel
     
-    def process_frame(self):
+    def process_frame(self) -> None:
         detection_was_disabled = True
         frame_timeout_counter = 0
         MAX_TIMEOUTS = 5
@@ -312,7 +324,8 @@ class MotionDetector:
                 frame = None
                 try:
                     with self.cap_lock:
-                        ret, frame = self.cap.read()
+                        if self.cap:
+                            ret, frame = self.cap.read()
                 except Exception as e:
                     logger.error(f"Error reading frame: {e}")
                     ret = False
@@ -349,7 +362,10 @@ class MotionDetector:
                     frame_resized = cv2.resize(frame, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
                     
                     # Apply ROI
-                    roi_frame = self.roi_manager.apply_roi_to_frame(frame_resized, self.camera_name)
+                    if self.roi_manager:
+                        roi_frame = self.roi_manager.apply_roi_to_frame(frame_resized, self.camera_name)
+                    else:
+                        roi_frame = frame_resized
                     
                     # Convert to grayscale for motion detection
                     frame_gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
@@ -408,15 +424,16 @@ class MotionDetector:
                                         (200, 330), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                     
                     # Show ROI on display frame
-                    roi = self.roi_manager.get_roi(self.camera_name)
-                    if roi['enabled']:
-                        height, width = display_frame.shape[:2]
-                        x = int(roi['x'] * width)
-                        y = int(roi['y'] * height)
-                        roi_width = int(roi['width'] * width)
-                        roi_height = int(roi['height'] * height)
-                        cv2.rectangle(display_frame, (x, y), (x+roi_width, y+roi_height), (0, 255, 255), 2)
-                        cv2.putText(display_frame, "ROI", (x+5, y+25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                    if self.roi_manager:
+                        roi = self.roi_manager.get_roi(self.camera_name)
+                        if roi.enabled:
+                            height, width = display_frame.shape[:2]
+                            x = int(roi.x * width)
+                            y = int(roi.y * height)
+                            roi_width = int(roi.width * width)
+                            roi_height = int(roi.height * height)
+                            cv2.rectangle(display_frame, (x, y), (x+roi_width, y+roi_height), (0, 255, 255), 2)
+                            cv2.putText(display_frame, "ROI", (x+5, y+25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
                     
                     # Create the right panel based on the setting
                     right_panel = self._create_right_panel(frame_resized, fg_mask)
@@ -445,12 +462,12 @@ class MotionDetector:
         self.stopped = True
         print("Frame processing thread stopped")
     
-    def start(self):
+    def start(self) -> None:
         self.thread = threading.Thread(target=self.process_frame)
         self.thread.daemon = True
         self.thread.start()
     
-    def get_jpeg(self):
+    def get_jpeg(self) -> Optional[bytes]:
         try:
             if self.current_frame is None:
                 return None
@@ -460,7 +477,7 @@ class MotionDetector:
             logger.error(f"Error encoding JPEG: {e}")
             return None
     
-    def stop(self):
+    def stop(self) -> None:
         if self.stopped:
             return
         self.sse_running = False
