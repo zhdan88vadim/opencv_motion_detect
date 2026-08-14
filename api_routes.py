@@ -1,22 +1,15 @@
-import os
-import time
-import glob
 import asyncio
 import queue
 import gc
-from datetime import datetime
-from typing import Optional
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 
 from config import (
-    CAMERAS, DEFAULT_CAMERA, RECORDINGS_DIR, logger, config
+    CAMERAS, DEFAULT_CAMERA, logger, config
 )
-from html_template import HTML_TEMPLATE
 from models import CameraROIRequest
 from motion_detector import MotionDetector
-from roi_manager import ROIManager
 from app_state import AppState
 
 
@@ -42,11 +35,9 @@ def setup_routes(app: FastAPI, state: AppState):
             cameras[name] = {
                 "url": config["url"],
                 "has_audio": config.get("has_audio", True),
-                "is_default": name == DEFAULT_CAMERA
             }
         
         return JSONResponse({
-            "status": "ok",
             "selected": next(item for item in CAMERAS if CAMERAS[item]["url"] == state.current_camera_url),
             "cameras": cameras,
             "default_camera": DEFAULT_CAMERA,
@@ -257,10 +248,8 @@ def setup_routes(app: FastAPI, state: AppState):
             detector = state.get_detector()
             
             if not new_state and config.recording_enable:
-                if detector and hasattr(detector, 'video_recorder'):
-                    if detector.video_recorder.recording:
-                        logger.info("Stopping recording...")
-                        detector.video_recorder.stop_recording()
+                logger.info("Stopping recording...")
+                detector.video_recorder.stop_recording()
             
             config.recording_enable = new_state
             logger.info(f"Recording toggled: {'ON' if new_state else 'OFF'}")
@@ -373,27 +362,6 @@ def setup_routes(app: FastAPI, state: AppState):
             })
         except Exception as e:
             logger.error(f"Error resetting ROI: {e}")
-            return JSONResponse(
-                {"status": "error", "message": str(e)},
-                status_code=500
-            )
-    
-    @app.get("/roi/all")
-    async def get_all_rois():
-        """Get all ROIs"""
-        roi_mgr = state.get_roi_manager()
-        if not roi_mgr:
-            return JSONResponse(
-                {"status": "error", "message": "ROI Manager not available"},
-                status_code=503
-            )
-        try:
-            return JSONResponse({
-                "status": "ok", 
-                "rois": roi_mgr.rois
-            })
-        except Exception as e:
-            logger.error(f"Error getting all ROIs: {e}")
             return JSONResponse(
                 {"status": "error", "message": str(e)},
                 status_code=500
