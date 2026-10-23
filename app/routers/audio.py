@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import queue
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -26,7 +26,10 @@ async def audio(services: Services = Depends(get_services)) -> StreamingResponse
             while True:
                 try:
                     chunk = await asyncio.get_running_loop().run_in_executor(
-                        None, q.get, True, 0.5,
+                        None,
+                        q.get,
+                        True,
+                        0.5,
                     )
                 except queue.Empty:
                     continue
@@ -35,5 +38,4 @@ async def audio(services: Services = Depends(get_services)) -> StreamingResponse
         finally:
             svc.unsubscribe(q)
 
-    return StreamingResponse(gen(), media_type="audio/wav",
-                             headers={"Cache-Control": "no-cache"})
+    return StreamingResponse(gen(), media_type="audio/wav", headers={"Cache-Control": "no-cache"})

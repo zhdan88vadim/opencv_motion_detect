@@ -8,7 +8,10 @@ from fastapi.responses import JSONResponse
 from app.container import Services
 from app.deps import get_services
 from app.models import (
-    DetectionToggle, MotionParamsRequest, RecordingToggle, SwitchCameraRequest,
+    DetectionToggle,
+    MotionParamsRequest,
+    RecordingToggle,
+    SwitchCameraRequest,
 )
 
 router = APIRouter()
@@ -16,17 +19,22 @@ router = APIRouter()
 
 @router.get("/api/cameras")
 async def cameras(services: Services = Depends(get_services)) -> JSONResponse:
-    return JSONResponse({
-        "cameras": {name: {"url": c.url, "has_audio": c.has_audio}
-                    for name, c in services.settings.cameras.items()},
-        "selected": services.current_camera,
-        "default": services.settings.default_camera,
-    })
+    return JSONResponse(
+        {
+            "cameras": {
+                name: {"url": c.url, "has_audio": c.has_audio}
+                for name, c in services.settings.cameras.items()
+            },
+            "selected": services.current_camera,
+            "default": services.settings.default_camera,
+        }
+    )
 
 
 @router.post("/api/camera")
-async def switch_camera(req: SwitchCameraRequest,
-                        services: Services = Depends(get_services)) -> JSONResponse:
+async def switch_camera(
+    req: SwitchCameraRequest, services: Services = Depends(get_services)
+) -> JSONResponse:
     if req.name not in services.settings.cameras:
         raise HTTPException(404, f"Unknown camera: {req.name}")
     try:
@@ -37,8 +45,9 @@ async def switch_camera(req: SwitchCameraRequest,
 
 
 @router.post("/api/detection")
-async def toggle_detection(req: DetectionToggle,
-                           services: Services = Depends(get_services)) -> JSONResponse:
+async def toggle_detection(
+    req: DetectionToggle, services: Services = Depends(get_services)
+) -> JSONResponse:
     services.state.detection_enabled = req.enabled
     if not req.enabled:
         services.state.jpeg = b""
@@ -46,16 +55,18 @@ async def toggle_detection(req: DetectionToggle,
 
 
 @router.post("/api/recording")
-async def toggle_recording(req: RecordingToggle,
-                           services: Services = Depends(get_services)) -> JSONResponse:
+async def toggle_recording(
+    req: RecordingToggle, services: Services = Depends(get_services)
+) -> JSONResponse:
     services.state.recording_enabled = req.enabled
     services.recorder.set_enabled(req.enabled)
     return JSONResponse({"recording_enabled": req.enabled})
 
 
 @router.post("/api/params")
-async def params(req: MotionParamsRequest,
-                 services: Services = Depends(get_services)) -> JSONResponse:
+async def params(
+    req: MotionParamsRequest, services: Services = Depends(get_services)
+) -> JSONResponse:
     # Global toggles — applied regardless of camera.
     if req.detection_enabled is not None:
         services.state.detection_enabled = req.detection_enabled
@@ -86,18 +97,19 @@ async def params(req: MotionParamsRequest,
     if services.current_camera == req.camera_name:
         services.analyzer.update_params(threshold, min_area)
 
-    return JSONResponse({
-        "camera_name": req.camera_name,
-        "threshold": threshold,
-        "min_area": min_area,
-        "detection_enabled": services.state.detection_enabled,
-        "recording_enabled": services.state.recording_enabled,
-    })
+    return JSONResponse(
+        {
+            "camera_name": req.camera_name,
+            "threshold": threshold,
+            "min_area": min_area,
+            "detection_enabled": services.state.detection_enabled,
+            "recording_enabled": services.state.recording_enabled,
+        }
+    )
 
 
 @router.get("/api/params/{camera_name}")
-async def get_params(camera_name: str,
-                     services: Services = Depends(get_services)) -> JSONResponse:
+async def get_params(camera_name: str, services: Services = Depends(get_services)) -> JSONResponse:
     try:
         threshold, min_area = services.roi.resolve_motion_params(
             camera_name,
@@ -106,13 +118,15 @@ async def get_params(camera_name: str,
         )
     except KeyError:
         raise HTTPException(404, camera_name)
-    return JSONResponse({
-        "camera_name": camera_name,
-        "threshold": threshold,
-        "min_area": min_area,
-        "detection_enabled": services.state.detection_enabled,
-        "recording_enabled": services.state.recording_enabled,
-    })
+    return JSONResponse(
+        {
+            "camera_name": camera_name,
+            "threshold": threshold,
+            "min_area": min_area,
+            "detection_enabled": services.state.detection_enabled,
+            "recording_enabled": services.state.recording_enabled,
+        }
+    )
 
 
 @router.get("/api/status")
@@ -122,8 +136,10 @@ async def status(services: Services = Depends(get_services)) -> JSONResponse:
 
 @router.get("/api/health")
 async def health(services: Services = Depends(get_services)) -> JSONResponse:
-    return JSONResponse({
-        "capture_ok": services.capture.healthy,
-        "last_frame_age_s": max(0.0, time.monotonic() - services.capture.last_frame_ts),
-        "camera": services.current_camera,
-    })
+    return JSONResponse(
+        {
+            "capture_ok": services.capture.healthy,
+            "last_frame_age_s": max(0.0, time.monotonic() - services.capture.last_frame_ts),
+            "camera": services.current_camera,
+        }
+    )

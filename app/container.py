@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from typing import Callable, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -32,12 +32,18 @@ class RuntimeState:
 
 
 class Services:
-    def __init__(self, settings: Settings, loop: asyncio.AbstractEventLoop,
-                 source_factory: Optional[Callable[[], FrameSource]] = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        loop: asyncio.AbstractEventLoop,
+        source_factory: Callable[[], FrameSource] | None = None,
+    ) -> None:
         self.settings = settings
         self.loop = loop
-        self.state = RuntimeState(detection_enabled=settings.detection_enabled,
-                                  recording_enabled=settings.recording_enabled)
+        self.state = RuntimeState(
+            detection_enabled=settings.detection_enabled,
+            recording_enabled=settings.recording_enabled,
+        )
         self.bus = EventBus(loop)
         self.roi = ROIManager(settings.roi_settings_file, list(settings.cameras.keys()))
         self.analyzer = MotionAnalyzer(MotionParams(settings.motion_threshold, settings.min_area))
@@ -52,12 +58,13 @@ class Services:
             after_seconds=settings.record_after_seconds,
             min_seconds=settings.min_record_seconds,
             max_seconds=settings.max_record_seconds,
-            fps=settings.record_fps, keep=settings.recordings_keep,
+            fps=settings.record_fps,
+            keep=settings.recordings_keep,
             size=(settings.display_width, settings.display_height),
         )
         self.recorder.set_enabled(self.state.recording_enabled)
 
-        self.audio: Optional[AudioService] = None
+        self.audio: AudioService | None = None
         self._audio_lock = asyncio.Lock()
 
         self._source_factory: Callable[[], FrameSource] = source_factory or (
@@ -101,9 +108,13 @@ class Services:
         result = self.analyzer.analyze(frame, roi)
 
         annotated = self.composer.annotate(
-            result.frame_bgr, result.detected, result.area,
-            threshold, min_area,
-            roi, self.recorder.recording,
+            result.frame_bgr,
+            result.detected,
+            result.area,
+            threshold,
+            min_area,
+            roi,
+            self.recorder.recording,
         )
         self.state.jpeg = encode_jpeg(annotated) or b""
         self.state.mask_jpeg = encode_jpeg(self.composer.mask_tile(result.mask)) or b""
@@ -112,7 +123,11 @@ class Services:
         self._publish_status(result.detected, result.area, threshold, min_area)
 
     def _publish_status(
-        self, detected: bool, area: float, threshold: int, min_area: int,
+        self,
+        detected: bool,
+        area: float,
+        threshold: int,
+        min_area: int,
     ) -> None:
         now = time.monotonic()
         if now - self._last_status_publish < 0.1:

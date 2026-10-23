@@ -20,7 +20,6 @@ from app.capture import OpenCVSource
 from app.models import ROISettings
 from app.motion import MotionAnalyzer, MotionParams
 
-
 DATA_DIR = Path(__file__).parent / "data"
 
 # ROI used for all clips (Balcony camera).
@@ -86,7 +85,9 @@ def _pattern(flags: list[bool]) -> str:
 def _cases() -> list:
     return [
         pytest.param(
-            DATA_DIR / name, expected, id=name,
+            DATA_DIR / name,
+            expected,
+            id=name,
             marks=pytest.mark.skipif(
                 not (DATA_DIR / name).exists(),
                 reason=f"video not found: {DATA_DIR / name}",
@@ -104,13 +105,14 @@ def test_clip_has_expected_bursts(clip_path: Path, expected_bursts: int) -> None
     pattern = _pattern(flags)
     max_area = max(areas) if areas else 0.0
 
-    print(f"\n{clip_path.name}: frames={len(flags)} detections={detections} "
-          f"bursts={bursts} expected={expected_bursts} max_area={max_area:.1f}")
+    print(
+        f"\n{clip_path.name}: frames={len(flags)} detections={detections} "
+        f"bursts={bursts} expected={expected_bursts} max_area={max_area:.1f}"
+    )
     print(f"pattern: {pattern}")
 
     assert detections > 0, (
-        f"[{clip_path.name}] no detections inside ROI; "
-        f"max_area={max_area:.1f}\n{pattern}"
+        f"[{clip_path.name}] no detections inside ROI; max_area={max_area:.1f}\n{pattern}"
     )
     assert bursts == expected_bursts, (
         f"[{clip_path.name}] expected {expected_bursts} burst(s), got {bursts}\n"
@@ -121,9 +123,7 @@ def test_clip_has_expected_bursts(clip_path: Path, expected_bursts: int) -> None
 # Optional per-frame dump. Run:
 #     pytest tests/test_real_video.py -s -k dump
 #     MOTION_TEST_VIDEO=/path/clip.mp4 pytest tests/test_real_video.py -s -k dump
-_DUMP_CLIP = Path(
-    os.environ.get("MOTION_TEST_VIDEO", DATA_DIR / "one_motion.mp4")
-).expanduser()
+_DUMP_CLIP = Path(os.environ.get("MOTION_TEST_VIDEO", DATA_DIR / "one_motion.mp4")).expanduser()
 
 
 @pytest.mark.skipif(not _DUMP_CLIP.exists(), reason=f"no clip at {_DUMP_CLIP}")

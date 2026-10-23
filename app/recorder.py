@@ -6,7 +6,6 @@ import time
 from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -19,17 +18,26 @@ log = logging.getLogger(__name__)
 # some CI runners). Each candidate: (fourcc_str, extension).
 _CODECS: list[tuple[str, str]] = [
     ("mp4v", ".mp4"),
-    ("avc1", ".mp4"),   # H.264, only if the build has it
-    ("MJPG", ".avi"),   # always available
+    ("avc1", ".mp4"),  # H.264, only if the build has it
+    ("MJPG", ".avi"),  # always available
 ]
 
 
 class Recorder:
     """Records short clips around motion. Frames written incrementally."""
 
-    def __init__(self, out_dir: Path, *, buffer_seconds: float, after_seconds: float,
-                 min_seconds: float, max_seconds: float, fps: float, keep: int,
-                 size: tuple[int, int]) -> None:
+    def __init__(
+        self,
+        out_dir: Path,
+        *,
+        buffer_seconds: float,
+        after_seconds: float,
+        min_seconds: float,
+        max_seconds: float,
+        fps: float,
+        keep: int,
+        size: tuple[int, int],
+    ) -> None:
         self.out_dir = Path(out_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self.buffer_seconds = buffer_seconds
@@ -45,12 +53,12 @@ class Recorder:
 
         self._enabled = False
         self._recording = False
-        self._writer: Optional[cv2.VideoWriter] = None
-        self._path: Optional[Path] = None
+        self._writer: cv2.VideoWriter | None = None
+        self._path: Path | None = None
         self._started_at = 0.0
         self._last_motion_at = 0.0
         self._lock = threading.Lock()
-        self._last_error: Optional[str] = None
+        self._last_error: str | None = None
 
     # -- state --
     @property
@@ -58,7 +66,7 @@ class Recorder:
         return self._recording
 
     @property
-    def last_error(self) -> Optional[str]:
+    def last_error(self) -> str | None:
         """Populated when the last start attempt failed to open a writer."""
         return self._last_error
 
@@ -94,10 +102,10 @@ class Recorder:
             self._buffer.clear()
 
     # -- internals --
-    def _open_writer(self, stem: str) -> Optional[tuple[cv2.VideoWriter, Path]]:
+    def _open_writer(self, stem: str) -> tuple[cv2.VideoWriter, Path] | None:
         """Try each codec; return the first that opens. Updates `_last_error` on failure."""
         self._last_error = None
-        last_err: Optional[str] = None
+        last_err: str | None = None
         for fourcc_str, ext in _CODECS:
             path = self.out_dir / f"{stem}{ext}"
             fourcc = cv2.VideoWriter_fourcc(*fourcc_str)

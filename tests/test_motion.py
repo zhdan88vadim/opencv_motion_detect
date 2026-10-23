@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import numpy as np
-
-from app.motion import MotionAnalyzer, MotionParams
 from app.models import ROISettings
+from app.motion import MotionAnalyzer, MotionParams
 
 
 def _feed(analyzer: MotionAnalyzer, frames, roi: ROISettings):
@@ -22,6 +20,7 @@ def test_no_motion_on_static(blank_frame, full_roi):
 
 def test_motion_detected_on_change(blank_frame, full_roi):
     from tests.conftest import make_motion_frame
+
     a = MotionAnalyzer(MotionParams(threshold=10, min_area=5))
     warmup = [blank_frame.copy() for _ in range(30)]
     moving = make_motion_frame()
@@ -32,6 +31,7 @@ def test_motion_detected_on_change(blank_frame, full_roi):
 
 def test_roi_limits_detection(blank_frame):
     from tests.conftest import make_motion_frame
+
     # ROI covers left half only
     roi = ROISettings(x=0.0, y=0.0, width=0.5, height=1.0, enabled=True)
     a = MotionAnalyzer(MotionParams(threshold=10, min_area=5))
@@ -50,6 +50,7 @@ def test_roi_limits_detection(blank_frame):
 
 def test_min_area_filters_small_objects(blank_frame, full_roi):
     from tests.conftest import make_motion_frame
+
     a = MotionAnalyzer(MotionParams(threshold=1, min_area=2000))
     warmup = [blank_frame.copy() for _ in range(30)]
     tiny = make_motion_frame(box=(10, 10, 5, 5))

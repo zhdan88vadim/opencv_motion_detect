@@ -15,9 +15,16 @@ class FrameComposer:
     def _resize(self, frame: NDArray[np.uint8]) -> NDArray[np.uint8]:
         return cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
 
-    def annotate(self, frame: NDArray[np.uint8], detected: bool, area: float,
-                 threshold: int, min_area: int, roi: ROISettings,
-                 recording: bool) -> NDArray[np.uint8]:
+    def annotate(
+        self,
+        frame: NDArray[np.uint8],
+        detected: bool,
+        area: float,
+        threshold: int,
+        min_area: int,
+        roi: ROISettings,
+        recording: bool,
+    ) -> NDArray[np.uint8]:
         out = self._resize(frame)
         h, w = out.shape[:2]
 
@@ -26,14 +33,22 @@ class FrameComposer:
             x1 = int((roi.x + roi.width) * w)
             y1 = int((roi.y + roi.height) * h)
             cv2.rectangle(out, (x0, y0), (x1, y1), (0, 220, 255), 2)
-            cv2.putText(out, "ROI", (x0 + 6, y0 + 22),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 220, 255), 2)
+            cv2.putText(
+                out, "ROI", (x0 + 6, y0 + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 220, 255), 2
+            )
 
         color = (0, 0, 255) if detected else (150, 150, 150)
         text = f"MOTION {area:.0f}" if detected else "NO MOTION"
         cv2.putText(out, text, (12, 32), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
-        cv2.putText(out, f"thr={threshold} min={min_area}", (12, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 1)
+        cv2.putText(
+            out,
+            f"thr={threshold} min={min_area}",
+            (12, 60),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            color,
+            1,
+        )
         if recording:
             cv2.circle(out, (w - 30, 30), 8, (0, 0, 255), -1)
             cv2.putText(out, "REC", (w - 70, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)

@@ -74,8 +74,14 @@ class MotionAnalyzer:
             if cv2.contourArea(c) < self.params.min_area:
                 continue
             cx, cy, cw, ch = cv2.boundingRect(c)
-            cv2.rectangle(annotated, (cx + offset[0], cy + offset[1]),
-                          (cx + offset[0] + cw, cy + offset[1] + ch), (0, 255, 0), 2)
+            cv2.rectangle(
+                annotated,
+                (cx + offset[0], cy + offset[1]),
+                (cx + offset[0] + cw, cy + offset[1] + ch),
+                (0, 255, 0),
+                2,
+            )
 
-        return MotionResult(detected=detected, area=area, contours=kept,
-                            frame_bgr=annotated, mask=fg)
+        return MotionResult(
+            detected=detected, area=area, contours=kept, frame_bgr=annotated, mask=fg
+        )

@@ -24,11 +24,15 @@ def test_roi_effective_flag():
 
 def test_manager_persists_and_cleans_unknown(tmp_path: Path):
     path = tmp_path / "roi.json"
-    path.write_text(json.dumps({
-        "CamA": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2, "enabled": True},
-        "Bogus": {"x": 0, "y": 0, "width": 1, "height": 1, "enabled": True},
-        "Сorridor": {"x": 0, "y": 0, "width": 1, "height": 1, "enabled": True},
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "CamA": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2, "enabled": True},
+                "Bogus": {"x": 0, "y": 0, "width": 1, "height": 1, "enabled": True},
+                "Сorridor": {"x": 0, "y": 0, "width": 1, "height": 1, "enabled": True},
+            }
+        )
+    )
     mgr = ROIManager(path, camera_names=["CamA", "CamB"])
     assert mgr.get("CamA").enabled is True
     assert mgr.get("CamB").enabled is False  # default
@@ -42,6 +46,7 @@ def test_manager_rejects_unknown(tmp_path: Path):
     mgr = ROIManager(tmp_path / "r.json", camera_names=["A"])
     with pytest.raises(KeyError):
         mgr.set("B", ROISettings())
+
 
 def test_per_camera_motion_params_resolution(tmp_path: Path):
     mgr = ROIManager(tmp_path / "roi.json", camera_names=["A", "B"])

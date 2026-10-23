@@ -31,6 +31,7 @@ def client(monkeypatch, tmp_path):
     settings.roi_settings_file = tmp_path / "roi.json"
 
     from app import container as container_mod
+
     original_init = container_mod.Services.__init__
 
     def patched_init(self, s, loop, source_factory=None):
@@ -73,9 +74,14 @@ def test_roi_unknown_camera_404(client):
 
 def test_params_update_per_camera(client):
     name = list(client.get("/api/cameras").json()["cameras"])[0]
-    r = client.post("/api/params", json={
-        "camera_name": name, "threshold": 300, "min_area": 10,
-    })
+    r = client.post(
+        "/api/params",
+        json={
+            "camera_name": name,
+            "threshold": 300,
+            "min_area": 10,
+        },
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["camera_name"] == name
@@ -111,14 +117,20 @@ def test_stream_returns_mjpeg(client):
             time.sleep(0.1)
     assert got, "stream produced no bytes within timeout"
 
+
 def test_params_per_camera(client):
     names = list(client.get("/api/cameras").json()["cameras"])
     assert len(names) >= 2, "need at least two cameras in test config"
     a, b = names[0], names[1]
 
-    r = client.post("/api/params", json={
-        "camera_name": a, "threshold": 400, "min_area": 15,
-    })
+    r = client.post(
+        "/api/params",
+        json={
+            "camera_name": a,
+            "threshold": 400,
+            "min_area": 15,
+        },
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["threshold"] == 400
@@ -138,10 +150,15 @@ def test_params_per_camera(client):
 
 def test_params_can_set_global_toggles(client):
     name = list(client.get("/api/cameras").json()["cameras"])[0]
-    r = client.post("/api/params", json={
-        "camera_name": name, "threshold": 250,
-        "detection_enabled": False, "recording_enabled": True,
-    })
+    r = client.post(
+        "/api/params",
+        json={
+            "camera_name": name,
+            "threshold": 250,
+            "detection_enabled": False,
+            "recording_enabled": True,
+        },
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["detection_enabled"] is False
@@ -154,15 +171,24 @@ def test_params_can_set_global_toggles(client):
     assert r.json()["recording_enabled"] is True
 
     # reset for other tests
-    client.post("/api/params", json={
-        "camera_name": name, "detection_enabled": True, "recording_enabled": False,
-    })
+    client.post(
+        "/api/params",
+        json={
+            "camera_name": name,
+            "detection_enabled": True,
+            "recording_enabled": False,
+        },
+    )
 
 
 def test_params_unknown_camera_404(client):
-    r = client.post("/api/params", json={
-        "camera_name": "DoesNotExist", "threshold": 300,
-    })
+    r = client.post(
+        "/api/params",
+        json={
+            "camera_name": "DoesNotExist",
+            "threshold": 300,
+        },
+    )
     assert r.status_code == 404
     r = client.get("/api/params/DoesNotExist")
     assert r.status_code == 404

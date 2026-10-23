@@ -11,8 +11,7 @@ router = APIRouter()
 
 
 @router.get("/api/roi/{camera_name}")
-async def get_roi(camera_name: str,
-                  services: Services = Depends(get_services)) -> JSONResponse:
+async def get_roi(camera_name: str, services: Services = Depends(get_services)) -> JSONResponse:
     try:
         return JSONResponse(services.roi.get(camera_name).model_dump())
     except KeyError:
@@ -20,8 +19,7 @@ async def get_roi(camera_name: str,
 
 
 @router.post("/api/roi")
-async def set_roi(req: ROISetRequest,
-                  services: Services = Depends(get_services)) -> JSONResponse:
+async def set_roi(req: ROISetRequest, services: Services = Depends(get_services)) -> JSONResponse:
     try:
         services.roi.set(req.camera_name, req.roi)
     except KeyError:
@@ -30,8 +28,7 @@ async def set_roi(req: ROISetRequest,
 
 
 @router.post("/api/roi/{camera_name}/reset")
-async def reset_roi(camera_name: str,
-                    services: Services = Depends(get_services)) -> JSONResponse:
+async def reset_roi(camera_name: str, services: Services = Depends(get_services)) -> JSONResponse:
     try:
         services.roi.reset(camera_name)
     except KeyError:

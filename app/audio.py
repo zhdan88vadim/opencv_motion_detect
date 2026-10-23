@@ -5,7 +5,6 @@ import queue
 import struct
 import subprocess
 import threading
-from typing import Optional
 
 log = logging.getLogger(__name__)
 
@@ -16,8 +15,19 @@ def wav_header(sample_rate: int = 44100, channels: int = 1, bits: int = 16) -> b
     block_align = channels * bits // 8
     return struct.pack(
         "<4sI4s4sIHHIIHH4sI",
-        b"RIFF", 0xFFFFFFFF, b"WAVE", b"fmt ", 16, 1, channels,
-        sample_rate, byte_rate, block_align, bits, b"data", 0x7FFFFFFF,
+        b"RIFF",
+        0xFFFFFFFF,
+        b"WAVE",
+        b"fmt ",
+        16,
+        1,
+        channels,
+        sample_rate,
+        byte_rate,
+        block_align,
+        bits,
+        b"data",
+        0x7FFFFFFF,
     )
 
 
@@ -29,7 +39,7 @@ class AudioService:
         self.header = wav_header(sample_rate, channels)
         self._clients: list[queue.Queue[bytes]] = []
         self._lock = threading.Lock()
-        self._proc: Optional[subprocess.Popen[bytes]] = None
+        self._proc: subprocess.Popen[bytes] | None = None
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="audio", daemon=True)
         self._available = True
@@ -71,15 +81,28 @@ class AudioService:
     # -- loop --
     def _run(self) -> None:
         cmd = [
-            "ffmpeg", "-loglevel", "error", "-rtsp_transport", "tcp",
-            "-i", self.rtsp_url, "-vn",
-            "-acodec", "pcm_s16le",
-            "-ar", str(self.sample_rate), "-ac", str(self.channels),
-            "-f", "s16le", "-",
+            "ffmpeg",
+            "-loglevel",
+            "error",
+            "-rtsp_transport",
+            "tcp",
+            "-i",
+            self.rtsp_url,
+            "-vn",
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            str(self.sample_rate),
+            "-ac",
+            str(self.channels),
+            "-f",
+            "s16le",
+            "-",
         ]
         try:
-            self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                          stderr=subprocess.PIPE, bufsize=0)
+            self._proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0
+            )
         except Exception as e:
             log.warning("ffmpeg not available: %s", e)
             self._available = False
@@ -95,6 +118,7 @@ class AudioService:
                 if b"No such" in line or b"Invalid data" in line:
                     log.info("Audio: no stream (%s)", line.decode(errors="ignore").strip())
                     self._available = False
+
         threading.Thread(target=drain, daemon=True).start()
 
         while not self._stop.is_set():

@@ -43,9 +43,7 @@ class ROIManager:
 
     def _save_locked(self) -> None:
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(
-            json.dumps({k: v.model_dump() for k, v in self._data.items()}, indent=2)
-        )
+        tmp.write_text(json.dumps({k: v.model_dump() for k, v in self._data.items()}, indent=2))
         tmp.replace(self.path)
 
     def get(self, camera_name: str) -> ROISettings:

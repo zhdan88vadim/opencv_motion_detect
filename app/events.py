@@ -4,7 +4,8 @@ import asyncio
 import json
 import logging
 import threading
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class EventBus:
         for q in queues:
             if q.full():
                 try:
-                    q.get_nowait()       # drop oldest
+                    q.get_nowait()  # drop oldest
                 except asyncio.QueueEmpty:
                     pass
             try:

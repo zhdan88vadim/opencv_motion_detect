@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import Callable, Optional, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 import cv2
 import numpy as np
@@ -14,7 +15,8 @@ log = logging.getLogger(__name__)
 
 class FrameSource(Protocol):
     """Anything that produces BGR frames. Lets tests inject synthetic video."""
-    def read(self) -> Optional[NDArray[np.uint8]]: ...
+
+    def read(self) -> NDArray[np.uint8] | None: ...
     def close(self) -> None: ...
 
 
@@ -25,13 +27,13 @@ class OpenCVSource:
     teardown indefinitely.
     """
 
-    def __init__(self, url: str | int,
-                 open_timeout_ms: int = 3000,
-                 read_timeout_ms: int = 3000) -> None:
+    def __init__(
+        self, url: str | int, open_timeout_ms: int = 3000, read_timeout_ms: int = 3000
+    ) -> None:
         self.url = url
         self._open_timeout_ms = open_timeout_ms
         self._read_timeout_ms = read_timeout_ms
-        self._cap: Optional[cv2.VideoCapture] = None
+        self._cap: cv2.VideoCapture | None = None
         self._open()
 
     def _open(self) -> None:
@@ -48,7 +50,7 @@ class OpenCVSource:
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self._cap = cap
 
-    def read(self) -> Optional[NDArray[np.uint8]]:
+    def read(self) -> NDArray[np.uint8] | None:
         cap = self._cap
         if cap is None:
             return None
@@ -77,18 +79,21 @@ class CaptureService:
       silently continuing (a hung capture thread will race on cv2 otherwise).
     """
 
-    def __init__(self,
-                 source_factory: Callable[[], FrameSource],
-                 on_frame: Callable[[NDArray[np.uint8], float], None],
-                 *, stop_timeout: float = 5.0) -> None:
+    def __init__(
+        self,
+        source_factory: Callable[[], FrameSource],
+        on_frame: Callable[[NDArray[np.uint8], float], None],
+        *,
+        stop_timeout: float = 5.0,
+    ) -> None:
         self._factory = source_factory
         self._on_frame = on_frame
         self._stop_timeout = stop_timeout
         self._stop = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._healthy = False
         self._last_frame_ts = 0.0
-        self._source: Optional[FrameSource] = None
+        self._source: FrameSource | None = None
 
     @property
     def healthy(self) -> bool:

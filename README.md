@@ -208,16 +208,6 @@ uv run python -m app.main
 6. **Решение** — area > motion_threshold
 7. **Запись** — старт при движении, стоп после record_after_seconds тишины или max_record_seconds
 
-## 🔧 Возможные проблемы
-
-**Нет картинки, в логах `method DESCRIBE failed: 404`** — медиасервер не публикует этот путь. Проверьте URL в settings.yaml.
-
-**`Recording too short, removed`** — движение короче min_record_seconds. Уменьшите record_after_seconds или min_record_seconds.
-
-**Нет звука** — ffmpeg отсутствует в PATH либо у камеры нет аудиодорожки. Кнопка покажет "Camera audio: unavailable".
-
-**Нет кодека в OpenCV** — Recorder автоматически переключается на MJPG/.avi. Если и это не удалось, в логе будет "no codec available".
-
 ## 🛠️ Разработка
 
     python -m app.main          # обычный запуск

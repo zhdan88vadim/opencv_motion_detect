@@ -8,13 +8,14 @@ import numpy as np
 
 from app.capture import CaptureService
 from app.composer import FrameComposer, encode_jpeg
+from app.models import ROISettings
 from app.motion import MotionAnalyzer, MotionParams
 from app.recorder import Recorder
-from app.models import ROISettings
 
 
 class VideoSource:
     """Plays a list of frames once, then stops returning frames."""
+
     def __init__(self, frames):
         self.frames = frames
         self.i = 0
@@ -41,8 +42,16 @@ def test_full_pipeline_detects_and_records(tmp_path: Path):
 
     analyzer = MotionAnalyzer(MotionParams(threshold=20, min_area=10))
     composer = FrameComposer(80, 60)
-    recorder = Recorder(tmp_path, buffer_seconds=0.2, after_seconds=0.2,
-                        min_seconds=0.0, max_seconds=2.0, fps=10, keep=5, size=(80, 60))
+    recorder = Recorder(
+        tmp_path,
+        buffer_seconds=0.2,
+        after_seconds=0.2,
+        min_seconds=0.0,
+        max_seconds=2.0,
+        fps=10,
+        keep=5,
+        size=(80, 60),
+    )
     recorder.set_enabled(True)
 
     detections = []
@@ -52,9 +61,15 @@ def test_full_pipeline_detects_and_records(tmp_path: Path):
         roi = ROISettings()
         result = analyzer.analyze(frame, roi)
         detections.append(result.detected)
-        annotated = composer.annotate(result.frame_bgr, result.detected, result.area,
-                                      analyzer.params.threshold, analyzer.params.min_area,
-                                      roi, recorder.recording)
+        annotated = composer.annotate(
+            result.frame_bgr,
+            result.detected,
+            result.area,
+            analyzer.params.threshold,
+            analyzer.params.min_area,
+            roi,
+            recorder.recording,
+        )
         jpegs.append(encode_jpeg(annotated))
         recorder.on_frame(annotated, result.detected, time.monotonic())
 
