@@ -78,7 +78,7 @@ def test_full_pipeline_detects_and_records(tmp_path: Path):
     # Wait until source is exhausted
     for _ in range(200):
         time.sleep(0.02)
-        if not cap.healthy and not cap._thread.is_alive():
+        if not cap.healthy and not cap.is_running:
             break
     cap.stop()
     recorder.stop()

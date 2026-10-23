@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import threading
@@ -36,19 +37,13 @@ class EventBus:
             queues = list(self._subs)
         for q in queues:
             if q.full():
-                try:
-                    q.get_nowait()  # drop oldest
-                except asyncio.QueueEmpty:
-                    pass
-            try:
+                with contextlib.suppress(asyncio.QueueEmpty):
+                    q.get_nowait()
+            with contextlib.suppress(asyncio.QueueFull):
                 q.put_nowait(data)
-            except asyncio.QueueFull:
-                pass
 
     async def close(self) -> None:
         with self._lock:
             for q in self._subs:
-                try:
+                with contextlib.suppress(asyncio.QueueFull):
                     q.put_nowait('{"kind":"shutdown"}')
-                except asyncio.QueueFull:
-                    pass

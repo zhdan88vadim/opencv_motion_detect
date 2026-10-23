@@ -18,7 +18,7 @@ class Settings(BaseModel):
     cameras: dict[str, CameraConfig]
     default_camera: str
     recordings_dir: Path = Path("recordings")
-    roi_settings_file: Path = Path("ro_settings.json")
+    roi_settings_file: Path = Path("roi_settings.json")
     recordings_keep: int = 100
 
     display_width: int = Field(800, ge=160)

@@ -64,11 +64,17 @@ function renderPills(s) {
   $('roiW').value = s.roi.width.toFixed(2);
   $('roiH').value = s.roi.height.toFixed(2);
 
-  // Values from server. Don't fight the user while they're dragging.
-  $('thrVal').textContent = s.threshold;
-  $('minVal').textContent = s.minArea;
-  if (document.activeElement !== $('threshold')) $('threshold').value = s.threshold;
-  if (document.activeElement !== $('minArea')) $('minArea').value = s.minArea;
+  // Values from server. Don't fight the user while they're dragging:
+  // both the input position and its label would otherwise jump back
+  // one debounce cycle behind the slider.
+  if (document.activeElement !== $('threshold')) {
+    $('threshold').value = s.threshold;
+    $('thrVal').textContent = s.threshold;
+  }
+  if (document.activeElement !== $('minArea')) {
+    $('minArea').value = s.minArea;
+    $('minVal').textContent = s.minArea;
+  }
 
   const btnAudio = $('btnAudio');
   if (!s.hasAudio) {

@@ -22,7 +22,6 @@ from app.motion import MotionAnalyzer, MotionParams
 
 DATA_DIR = Path(__file__).parent / "data"
 
-# ROI used for all clips (Balcony camera).
 BALCONY_ROI = ROISettings(
     x=0.8083888778700411,
     y=0.09039514929542823,
@@ -31,7 +30,6 @@ BALCONY_ROI = ROISettings(
     enabled=True,
 )
 
-# (filename, expected number of motion bursts)
 CLIPS: list[tuple[str, int]] = [
     ("short_clip.mp4", 3),
     ("motion_20261023_112414_832.mp4", 2),
@@ -40,15 +38,12 @@ CLIPS: list[tuple[str, int]] = [
 
 
 def _analyze_clip(path: Path) -> tuple[list[bool], list[float]]:
-    """Return per-frame (detected flags, motion areas) for the whole clip."""
     src = OpenCVSource(str(path))
     analyzer = MotionAnalyzer(MotionParams(threshold=200, min_area=5))
     flags: list[bool] = []
     areas: list[float] = []
 
     try:
-        # Warm up MOG2 so the first real frame doesn't register as motion
-        # against an empty background model.
         first = src.read()
         assert first is not None, f"cannot decode {path}"
         h, w = first.shape[:2]
@@ -75,7 +70,7 @@ def _iter_rest(src: OpenCVSource):
 
 
 def _count_bursts(flags: list[bool]) -> int:
-    return sum(1 for prev, cur in zip([False, *flags], flags) if cur and not prev)
+    return sum(1 for prev, cur in zip([False, *flags], flags, strict=False) if cur and not prev)
 
 
 def _pattern(flags: list[bool]) -> str:
@@ -120,16 +115,17 @@ def test_clip_has_expected_bursts(clip_path: Path, expected_bursts: int) -> None
     )
 
 
-# Optional per-frame dump. Run:
-#     pytest tests/test_real_video.py -s -k dump
-#     MOTION_TEST_VIDEO=/path/clip.mp4 pytest tests/test_real_video.py -s -k dump
 _DUMP_CLIP = Path(os.environ.get("MOTION_TEST_VIDEO", DATA_DIR / "one_motion.mp4")).expanduser()
 
 
 @pytest.mark.skipif(not _DUMP_CLIP.exists(), reason=f"no clip at {_DUMP_CLIP}")
+@pytest.mark.skipif(
+    not os.environ.get("MOTION_DUMP"),
+    reason="set MOTION_DUMP=1 to print per-frame timeline",
+)
 def test_dump_detection_timeline() -> None:
     flags, areas = _analyze_clip(_DUMP_CLIP)
     print(f"\n{_DUMP_CLIP.name}: {len(flags)} frames")
-    for i, (f, a) in enumerate(zip(flags, areas)):
+    for i, (f, a) in enumerate(zip(flags, areas, strict=False)):
         print(f"frame {i:4d}  detected={int(f)}  area={a:8.1f}")
     print(f"pattern: {_pattern(flags)}")

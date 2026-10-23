@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 import time
@@ -38,8 +39,6 @@ class OpenCVSource:
 
     def _open(self) -> None:
         self.close()
-        # OPEN/READ timeouts must be set via cv2.CAP_PROP_* AFTER creation
-        # but BEFORE open() for FFmpeg in recent OpenCV.
         cap = cv2.VideoCapture()
         cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, self._open_timeout_ms)
         cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, self._read_timeout_ms)
@@ -63,10 +62,8 @@ class OpenCVSource:
         cap = self._cap
         self._cap = None
         if cap is not None:
-            try:
+            with contextlib.suppress(Exception):
                 cap.release()
-            except Exception:
-                pass
 
 
 class CaptureService:
@@ -96,6 +93,10 @@ class CaptureService:
         self._source: FrameSource | None = None
 
     @property
+    def is_running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    @property
     def healthy(self) -> bool:
         return self._healthy
 
@@ -116,7 +117,6 @@ class CaptureService:
         if t is not None and t.is_alive():
             t.join(timeout=self._stop_timeout)
             if t.is_alive():
-                # Do NOT proceed: touching cv2 from a second thread is UB.
                 raise RuntimeError(
                     "Capture thread did not stop within "
                     f"{self._stop_timeout}s; cannot safely reinitialize"
@@ -124,7 +124,6 @@ class CaptureService:
         self._thread = None
         self._source = None
 
-    # -- loop (runs on the capture thread) --
     def _run(self) -> None:
         backoff = 1.0
         try:
@@ -146,10 +145,8 @@ class CaptureService:
                 if frame is None:
                     log.warning("Frame read failed; reopening")
                     self._healthy = False
-                    try:
+                    with contextlib.suppress(Exception):
                         self._source.close()
-                    except Exception:
-                        pass
                     self._source = None
                     self._stop.wait(0.5)
                     continue
@@ -160,11 +157,8 @@ class CaptureService:
                 except Exception as e:
                     log.exception("on_frame callback error: %s", e)
         finally:
-            # Thread owns the source. Close it here, nowhere else.
             if self._source is not None:
-                try:
+                with contextlib.suppress(Exception):
                     self._source.close()
-                except Exception:
-                    pass
                 self._source = None
             self._healthy = False

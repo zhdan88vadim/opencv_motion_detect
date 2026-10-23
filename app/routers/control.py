@@ -40,7 +40,7 @@ async def switch_camera(
     try:
         await services.switch_camera(req.name)
     except RuntimeError as e:
-        raise HTTPException(409, f"Camera switch aborted: {e}")
+        raise HTTPException(409, f"Camera switch aborted: {e}") from e
     return JSONResponse({"camera": req.name})
 
 
@@ -67,7 +67,6 @@ async def toggle_recording(
 async def params(
     req: MotionParamsRequest, services: Services = Depends(get_services)
 ) -> JSONResponse:
-    # Global toggles — applied regardless of camera.
     if req.detection_enabled is not None:
         services.state.detection_enabled = req.detection_enabled
         if not req.detection_enabled:
@@ -77,11 +76,10 @@ async def params(
         services.state.recording_enabled = req.recording_enabled
         services.recorder.set_enabled(req.recording_enabled)
 
-    # Per-camera threshold / min_area.
     try:
         roi = services.roi.get(req.camera_name)
-    except KeyError:
-        raise HTTPException(404, req.camera_name)
+    except KeyError as e:
+        raise HTTPException(404, req.camera_name) from e
 
     if req.threshold is not None:
         roi.motion_threshold = req.threshold
@@ -116,8 +114,8 @@ async def get_params(camera_name: str, services: Services = Depends(get_services
             services.settings.motion_threshold,
             services.settings.min_area,
         )
-    except KeyError:
-        raise HTTPException(404, camera_name)
+    except KeyError as e:
+        raise HTTPException(404, camera_name) from e
     return JSONResponse(
         {
             "camera_name": camera_name,

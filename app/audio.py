@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import queue
 import struct
@@ -10,7 +11,6 @@ log = logging.getLogger(__name__)
 
 
 def wav_header(sample_rate: int = 44100, channels: int = 1, bits: int = 16) -> bytes:
-    # Streaming-friendly header with max sizes
     byte_rate = sample_rate * channels * bits // 8
     block_align = channels * bits // 8
     return struct.pack(
@@ -58,10 +58,8 @@ class AudioService:
                 self._proc.terminate()
                 self._proc.wait(timeout=2)
             except Exception:
-                try:
+                with contextlib.suppress(Exception):
                     self._proc.kill()
-                except Exception:
-                    pass
         if self._thread.is_alive():
             self._thread.join(timeout=2)
         with self._lock:
@@ -78,7 +76,6 @@ class AudioService:
             if q in self._clients:
                 self._clients.remove(q)
 
-    # -- loop --
     def _run(self) -> None:
         cmd = [
             "ffmpeg",
@@ -111,7 +108,6 @@ class AudioService:
         assert self._proc.stdout is not None
         assert self._proc.stderr is not None
 
-        # Drain stderr so ffmpeg doesn't block
         def drain() -> None:
             assert self._proc and self._proc.stderr
             for line in iter(self._proc.stderr.readline, b""):
@@ -129,10 +125,8 @@ class AudioService:
                 dead: list[queue.Queue[bytes]] = []
                 for q in self._clients:
                     if q.full():
-                        try:
+                        with contextlib.suppress(queue.Empty):
                             q.get_nowait()
-                        except queue.Empty:
-                            pass
                     try:
                         q.put_nowait(chunk)
                     except queue.Full:
