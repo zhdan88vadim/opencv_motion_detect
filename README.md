@@ -14,6 +14,16 @@ uv run mypy app
 uv run python -m app.main
 
 
+pip install files-to-prompt
+
+files-to-prompt . -e py -e html -e js --ignore-gitignore --ignore-gitignore -n -o output.txt
+
+# dry run first
+python apply_edits.py dump.txt edits.json --dry-run -v
+
+# if dry run shows all "would write", apply
+python apply_edits.py dump.txt edits.json -v
+
 -->
 
 # OpenCV Motion Detection System

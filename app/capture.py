@@ -122,7 +122,8 @@ class CaptureService:
                     f"{self._stop_timeout}s; cannot safely reinitialize"
                 )
         self._thread = None
-        self._source = None
+        if t is None or not t.is_alive():
+            self._source = None
 
     def _run(self) -> None:
         backoff = 1.0

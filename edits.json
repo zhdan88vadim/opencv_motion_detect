@@ -1,0 +1,17 @@
+[
+  {
+    "file": "app/container.py",
+    "old": "        async with self._camera_lock:\n            log.info(\"Switching camera -> %s\", name)\n            await self._stop_audio()\n            try:\n                self.capture.stop()\n            except Exception as e:\n                log.error(\"Cannot stop previous capture: %s\", e)\n                raise\n",
+    "new": "        async with self._camera_lock:\n            log.info(\"Switching camera -> %s\", name)\n            loop = asyncio.get_running_loop()\n            stop_audio = asyncio.create_task(self._stop_audio())\n            stop_capture = loop.run_in_executor(None, self.capture.stop)\n            results = await asyncio.gather(\n                stop_audio, stop_capture, return_exceptions=True\n            )\n            capture_exc = results[1]\n            if isinstance(capture_exc, BaseException):\n                log.error(\"Cannot stop previous capture: %s\", capture_exc)\n                raise capture_exc\n"
+  },
+  {
+    "file": "app/container.py",
+    "old": "    async def _stop_audio(self) -> None:\n        async with self._audio_lock:\n            if self.audio:\n                self.audio.stop()\n                self.audio = None\n",
+    "new": "    async def _stop_audio(self) -> None:\n        async with self._audio_lock:\n            if self.audio:\n                await asyncio.get_running_loop().run_in_executor(\n                    None, self.audio.stop\n                )\n                self.audio = None\n"
+  },
+  {
+    "file": "app/audio.py",
+    "old": "            try:\n                self._proc.terminate()\n                self._proc.wait(timeout=2)\n            except Exception:\n                with contextlib.suppress(Exception):\n                    self._proc.kill()\n        if self._thread.is_alive():\n            self._thread.join(timeout=2)\n",
+    "new": "            try:\n                self._proc.terminate()\n                self._proc.wait(timeout=0.5)\n            except Exception:\n                with contextlib.suppress(Exception):\n                    self._proc.kill()\n        if self._thread.is_alive():\n            self._thread.join(timeout=0.5)\n"
+  }
+]

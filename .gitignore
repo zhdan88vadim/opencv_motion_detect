@@ -41,3 +41,5 @@ todo/
 *.mp4
 01_env_python.md
 roi_settings.json
+output.txt
+.gitignore

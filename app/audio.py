@@ -56,12 +56,12 @@ class AudioService:
         if self._proc and self._proc.poll() is None:
             try:
                 self._proc.terminate()
-                self._proc.wait(timeout=2)
+                self._proc.wait(timeout=0.5)
             except Exception:
                 with contextlib.suppress(Exception):
                     self._proc.kill()
         if self._thread.is_alive():
-            self._thread.join(timeout=2)
+            self._thread.join(timeout=0.5)
         with self._lock:
             self._clients.clear()
 
@@ -117,10 +117,12 @@ class AudioService:
 
         threading.Thread(target=drain, daemon=True).start()
 
+        got_data = False
         while not self._stop.is_set():
             chunk = self._proc.stdout.read(4096)
             if not chunk:
                 break
+            got_data = True
             with self._lock:
                 dead: list[queue.Queue[bytes]] = []
                 for q in self._clients:
@@ -133,3 +135,6 @@ class AudioService:
                         dead.append(q)
                 for q in dead:
                     self._clients.remove(q)
+
+        if not self._stop.is_set() and not got_data:
+            self._available = False

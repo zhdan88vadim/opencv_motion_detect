@@ -57,6 +57,7 @@ class Recorder:
         self._last_motion_at = 0.0
         self._lock = threading.Lock()
         self._last_error: str | None = None
+        self._written_frames = 0
 
     @property
     def recording(self) -> bool:
@@ -122,6 +123,7 @@ class Recorder:
             if f.shape[1::-1] != self.size:
                 f = cv2.resize(f, self.size)
             self._writer.write(f)
+        self._written_frames = len(self._buffer)
         self._recording = True
         self._started_at = now
         self._last_motion_at = now
@@ -133,13 +135,16 @@ class Recorder:
         if frame.shape[1::-1] != self.size:
             frame = cv2.resize(frame, self.size)
         self._writer.write(frame)
+        self._written_frames += 1
 
     def _stop_locked(self) -> None:
         if self._writer:
             self._writer.release()
             self._writer = None
 
-        duration = time.monotonic() - self._started_at
+        wall = time.monotonic() - self._started_at
+        by_frames = self._written_frames / self.fps if self.fps > 0 else 0.0
+        duration = by_frames if by_frames > 0 else wall
 
         if self._path is None:
             self._recording = False
@@ -156,6 +161,7 @@ class Recorder:
             log.warning("Recording file missing at stop: %s", self._path)
 
         self._path = None
+        self._written_frames = 0
         self._recording = False
 
     def _prune_locked(self) -> None:
