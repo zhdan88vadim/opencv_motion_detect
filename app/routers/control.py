@@ -10,6 +10,7 @@ from app.deps import get_services
 from app.models import (
     DetectionToggle,
     MotionParamsRequest,
+    PanelModeRequest,
     RecordingToggle,
     SwitchCameraRequest,
 )
@@ -61,6 +62,19 @@ async def toggle_recording(
     services.state.recording_enabled = req.enabled
     services.recorder.set_enabled(req.enabled)
     return JSONResponse({"recording_enabled": req.enabled})
+
+
+@router.get("/api/panel")
+async def get_panel_mode(services: Services = Depends(get_services)) -> JSONResponse:
+    return JSONResponse({"panel_mode": services.state.panel_mode})
+
+
+@router.post("/api/panel")
+async def set_panel_mode(
+    req: PanelModeRequest, services: Services = Depends(get_services)
+) -> JSONResponse:
+    services.state.panel_mode = req.mode
+    return JSONResponse({"panel_mode": req.mode})
 
 
 @router.post("/api/params")

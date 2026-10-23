@@ -13,6 +13,7 @@ const store = createStore({
   motion: false, motionArea: 0,
   threshold: 200, minArea: 5,
   roi: { x: 0, y: 0, width: 1, height: 1, enabled: false },
+  panelMode: 'mask',
   connected: false,
 });
 
@@ -64,9 +65,6 @@ function renderPills(s) {
   $('roiW').value = s.roi.width.toFixed(2);
   $('roiH').value = s.roi.height.toFixed(2);
 
-  // Values from server. Don't fight the user while they're dragging:
-  // both the input position and its label would otherwise jump back
-  // one debounce cycle behind the slider.
   if (document.activeElement !== $('threshold')) {
     $('threshold').value = s.threshold;
     $('thrVal').textContent = s.threshold;
@@ -75,6 +73,11 @@ function renderPills(s) {
     $('minArea').value = s.minArea;
     $('minVal').textContent = s.minArea;
   }
+
+  // Panel mode segmented control.
+  $('btnPanelMask').classList.toggle('is-active', s.panelMode === 'mask');
+  $('btnPanelRoi').classList.toggle('is-active', s.panelMode === 'roi');
+  $('panelTitle').textContent = s.panelMode === 'roi' ? 'ROI zoom' : 'Mask';
 
   const btnAudio = $('btnAudio');
   if (!s.hasAudio) {
@@ -91,6 +94,7 @@ function renderPills(s) {
 store.subscribe(s => {
   renderPills(s);
   roiCanvas.setRoi(s.roi);
+  stream.setPanelMode(s.panelMode);
 });
 
 connectSSE('/events', (msg) => {
@@ -106,6 +110,7 @@ connectSSE('/events', (msg) => {
       recording: msg.recording,
       recordingEnabled: msg.recording_enabled,
       hasAudio: msg.has_audio,
+      panelMode: msg.panel_mode ?? prev.panelMode,
     });
     if (msg.motion_detected && !prev.motion) alerts.startMotion();
     if (!msg.motion_detected && prev.motion) alerts.stopMotion();
@@ -150,6 +155,15 @@ async function loadCameraSettings(camera) {
   }
 }
 
+async function loadPanelMode() {
+  try {
+    const data = await api.getPanelMode();
+    store.set({ panelMode: data.panel_mode });
+  } catch (e) {
+    // Non-fatal: keep the default 'mask'.
+  }
+}
+
 $('cameraSelect').addEventListener('change', async (e) => {
   const name = e.target.value;
   try {
@@ -177,6 +191,19 @@ $('btnAudio').addEventListener('click', async () => {
   else if (camAudio.available) toast('Camera audio stopped');
   else toast('Camera audio unavailable for this stream', 'warn');
   renderPills(store.get());
+});
+
+$('btnPanelMask').addEventListener('click', async () => {
+  try {
+    const data = await api.setPanelMode('mask');
+    store.set({ panelMode: data.panel_mode });
+  } catch (e) { toast('Panel switch failed: ' + e.message, 'error'); }
+});
+$('btnPanelRoi').addEventListener('click', async () => {
+  try {
+    const data = await api.setPanelMode('roi');
+    store.set({ panelMode: data.panel_mode });
+  } catch (e) { toast('Panel switch failed: ' + e.message, 'error'); }
 });
 
 $('btnRoiToggle').addEventListener('click', async () => {
@@ -208,7 +235,6 @@ function debounceParams() {
     store.set({ threshold, minArea });
     try {
       const data = await api.setParams(store.get().camera, threshold, minArea);
-      // Server echo — authoritative.
       $('thrVal').textContent = data.threshold;
       $('minVal').textContent = data.min_area;
     } catch (e) {
@@ -239,4 +265,5 @@ $('minArea').addEventListener('input', () => {
   });
 });
 
+loadPanelMode();
 loadCameras().catch(e => toast('Init failed: ' + e.message, 'error'));

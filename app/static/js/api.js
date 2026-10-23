@@ -21,8 +21,11 @@ export const api = {
       body: JSON.stringify({ camera_name, threshold, min_area }),
     }),
   getParams: (name) => call(`/api/params/${encodeURIComponent(name)}`),
+  getPanelMode: () => call('/api/panel'),
+  setPanelMode: (mode) => call('/api/panel', { method: 'POST', body: JSON.stringify({ mode }) }),
   getRoi: (name) => call(`/api/roi/${encodeURIComponent(name)}`),
-  setRoi: (camera_name, roi) => call('/api/roi', { method: 'POST', body: JSON.stringify({ camera_name, roi }) }),
+  setRoi: (camera_name, roi) =>
+    call('/api/roi', { method: 'POST', body: JSON.stringify({ camera_name, roi }) }),
   resetRoi: (name) => call(`/api/roi/${encodeURIComponent(name)}/reset`, { method: 'POST' }),
   recordings: () => call('/api/recordings'),
 };

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -29,32 +29,39 @@ def _mjpeg(frames: AsyncIterator[bytes]) -> StreamingResponse:
     return StreamingResponse(gen(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
-@router.get("/stream.mjpg")
-async def stream(request: Request, services: Services = Depends(get_services)) -> StreamingResponse:
+def _stream_jpeg(
+    request: Request, get_bytes: Callable[[], bytes], *, fps: int = 15
+) -> StreamingResponse:
     async def frames() -> AsyncIterator[bytes]:
         last = b""
         while not await request.is_disconnected():
-            jpeg = services.state.jpeg
+            jpeg = get_bytes()
             if jpeg and jpeg is not last:
                 last = jpeg
                 yield last
-            await asyncio.sleep(1 / 15)
+            await asyncio.sleep(1 / fps)
 
     return _mjpeg(frames())
+
+
+@router.get("/stream.mjpg")
+async def stream(request: Request, services: Services = Depends(get_services)) -> StreamingResponse:
+    return _stream_jpeg(request, lambda: services.state.jpeg)
 
 
 @router.get("/mask.mjpg")
 async def mask(request: Request, services: Services = Depends(get_services)) -> StreamingResponse:
-    async def frames() -> AsyncIterator[bytes]:
-        last = b""
-        while not await request.is_disconnected():
-            jpeg = services.state.mask_jpeg
-            if jpeg and jpeg is not last:
-                last = jpeg
-                yield last
-            await asyncio.sleep(1 / 10)
+    return _stream_jpeg(request, lambda: services.state.mask_jpeg)
 
-    return _mjpeg(frames())
+
+@router.get("/roi.mjpg")
+async def roi(request: Request, services: Services = Depends(get_services)) -> StreamingResponse:
+    return _stream_jpeg(request, lambda: services.state.roi_jpeg)
+
+
+@router.get("/panel.mjpg")
+async def panel(request: Request, services: Services = Depends(get_services)) -> StreamingResponse:
+    return _stream_jpeg(request, lambda: services.state.panel_jpeg)
 
 
 @router.get("/events")

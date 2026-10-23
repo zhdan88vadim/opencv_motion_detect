@@ -66,8 +66,14 @@
       </section>
 
       <section class="card">
-        <h3>Mask</h3>
-        <img id="mask" class="mask" alt="motion mask"/>
+        <div class="card__header">
+          <h3 id="panelTitle">Mask</h3>
+          <div class="seg" role="group" aria-label="Panel view">
+            <button id="btnPanelMask" class="seg__btn is-active">Mask</button>
+            <button id="btnPanelRoi" class="seg__btn">ROI</button>
+          </div>
+        </div>
+        <img id="mask" class="mask" alt="motion panel"/>
       </section>
     </aside>
   </main>

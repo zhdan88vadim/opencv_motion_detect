@@ -13,7 +13,7 @@ from app.audio import AudioService
 from app.capture import CaptureService, FrameSource, OpenCVSource
 from app.composer import FrameComposer, encode_jpeg
 from app.events import EventBus
-from app.models import Status
+from app.models import PanelMode, Status
 from app.motion import MotionAnalyzer, MotionParams
 from app.recorder import Recorder
 from app.roi import ROIManager
@@ -28,7 +28,13 @@ class RuntimeState:
     recording_enabled: bool = False
     jpeg: bytes = b""
     mask_jpeg: bytes = b""
+    roi_jpeg: bytes = b""
+    panel_mode: PanelMode = "mask"
     last_status: dict = field(default_factory=dict)
+
+    @property
+    def panel_jpeg(self) -> bytes:
+        return self.roi_jpeg if self.panel_mode == "roi" else self.mask_jpeg
 
 
 class Services:
@@ -118,6 +124,17 @@ class Services:
         )
         self.state.jpeg = encode_jpeg(annotated) or b""
         self.state.mask_jpeg = encode_jpeg(self.composer.mask_tile(result.mask)) or b""
+        self.state.roi_jpeg = (
+            encode_jpeg(
+                self.composer.roi_tile(
+                    result.frame_bgr,
+                    roi,
+                    detected=result.detected,
+                    motion_area=result.area,
+                )
+            )
+            or b""
+        )
 
         self.recorder.on_frame(annotated, result.detected, time.monotonic())
         self._publish_status(result.detected, result.area, threshold, min_area)
@@ -145,6 +162,7 @@ class Services:
             recording_enabled=self.state.recording_enabled,
             has_audio=bool(self.audio and self.audio.available),
             capture_ok=self.capture.healthy,
+            panel_mode=self.state.panel_mode,
         )
         payload = {"kind": "status", **asdict(status)}
         self.state.last_status = payload

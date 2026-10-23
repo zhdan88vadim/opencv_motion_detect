@@ -77,6 +77,13 @@ class SwitchCameraRequest(BaseModel):
     name: str
 
 
+PanelMode = Literal["mask", "roi"]
+
+
+class PanelModeRequest(BaseModel):
+    mode: PanelMode
+
+
 # ---------- Results / events ----------
 
 
@@ -101,6 +108,7 @@ class Status:
     recording_enabled: bool
     has_audio: bool
     capture_ok: bool
+    panel_mode: PanelMode = "mask"
 
     def as_dict(self) -> dict:
         return self.__dict__.copy()
