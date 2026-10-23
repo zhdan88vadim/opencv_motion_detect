@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Motion</title>
+  <link rel="stylesheet" href="/static/css/app.css"/>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1>Motion</h1>
+    <div class="pills">
+      <span id="pill-conn" class="pill pill--muted" aria-live="polite">…</span>
+      <span id="pill-cam" class="pill">—</span>
+      <span id="pill-motion" class="pill" aria-live="polite">no motion</span>
+      <span id="pill-rec" class="pill">rec off</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="video">
+      <img id="stream" alt="Live camera"/>
+      <canvas id="roiCanvas" class="roi-canvas"></canvas>
+      <div class="video__hint" id="drawHint" hidden>Drag to draw ROI</div>
+    </section>
+
+    <aside class="panel">
+      <section class="card">
+        <label class="label" for="cameraSelect">Camera</label>
+        <select id="cameraSelect"></select>
+      </section>
+
+      <section class="card">
+        <label class="label" for="threshold">
+          Threshold <span class="value" id="thrVal">200</span>
+        </label>
+        <input id="threshold" type="range" min="10" max="2000" step="10" value="200"/>
+        <label class="label" for="minArea">
+          Min area <span class="value" id="minVal">5</span>
+        </label>
+        <input id="minArea" type="range" min="1" max="500" step="1" value="5"/>
+      </section>
+
+      <section class="card">
+        <h3>ROI</h3>
+        <div class="btnrow">
+          <button id="btnRoiToggle" class="btn">Enable</button>
+          <button id="btnRoiDraw" class="btn btn--ghost">Draw</button>
+          <button id="btnRoiReset" class="btn btn--ghost">Reset</button>
+        </div>
+        <div class="grid4" aria-label="ROI numeric">
+          <label>X<input id="roiX" type="number" min="0" max="1" step="0.01"/></label>
+          <label>Y<input id="roiY" type="number" min="0" max="1" step="0.01"/></label>
+          <label>W<input id="roiW" type="number" min="0" max="1" step="0.01"/></label>
+          <label>H<input id="roiH" type="number" min="0" max="1" step="0.01"/></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="btnrow">
+          <button id="btnDetection" class="btn">Detection: on</button>
+          <button id="btnRecord" class="btn">Record: off</button>
+          <button id="btnAudio" class="btn btn--ghost">Mute alerts</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Mask</h3>
+        <img id="mask" class="mask" alt="motion mask"/>
+      </section>
+    </aside>
+  </main>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</div>
+<audio id="camAudio" preload="none"></audio>
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

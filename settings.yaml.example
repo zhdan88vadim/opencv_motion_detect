@@ -1,0 +1,94 @@
+# ============================================================================
+# Motion Detection — application settings
+#
+# All values are validated by app/settings.py (Pydantic). Any field may be
+# omitted and the default from the Settings model will be used.
+#
+# Paths are relative to the process working directory unless absolute.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Cameras
+#
+# Each entry:
+#   url       — RTSP URL, HTTP stream, or a local file path (str).
+#               For local test files use an absolute path, e.g.
+#               "/home/user/clips/test.mp4" or "C:/clips/test.mp4".
+#   has_audio — whether to spawn the ffmpeg audio pipeline for this camera.
+#               Set to false for cameras/files without audio to skip ffmpeg.
+#
+# The `default_camera` key below must match one of the names here.
+# ----------------------------------------------------------------------------
+cameras:
+  Balcony:
+    url: "rtsp://192.168.0.102:8554/balcony_camera_hero_4mp_wifi_h264"
+    has_audio: true
+
+  Kitchen:
+    url: "rtsp://192.168.0.102:8554/h1_long_1_h264"
+    has_audio: true
+
+  # Example: local test video. Uncomment to use.
+  # TestClip:
+  #   url: "/absolute/path/to/short_clip.mp4"
+  #   has_audio: false
+
+default_camera: "Balcony"
+
+# ----------------------------------------------------------------------------
+# Storage
+# ----------------------------------------------------------------------------
+recordings_dir: "recordings"
+roi_settings_file: "roi_settings.json"
+recordings_keep: 100            # number of newest recordings to keep
+
+# ----------------------------------------------------------------------------
+# Display / composition
+#
+# Frames sent to /stream.mjpg and saved by the recorder are resized to this
+# resolution. The motion analysis runs on this resized frame, so a smaller
+# size is faster and produces coarser contours.
+# ----------------------------------------------------------------------------
+display_width: 800
+display_height: 600
+
+# ----------------------------------------------------------------------------
+# Motion detection
+#
+# motion_threshold — total foreground pixel area (sum of contour areas in
+#                    display pixels) required to declare "motion".
+#                    Lower = more sensitive.
+# min_area         — minimum single-contour area; smaller blobs are ignored
+#                    (noise, rain, insects, small reflections).
+# analysis_fps     — how often the analyzer runs. Independent of capture fps.
+#                    The capture loop still reads every frame so the recorder
+#                    buffer stays smooth; only analysis is throttled.
+# ----------------------------------------------------------------------------
+motion_threshold: 200
+min_area: 5
+analysis_fps: 5.0
+
+# ----------------------------------------------------------------------------
+# Recording
+#
+# buffer_seconds       — pre-roll kept in RAM (only when recording is enabled).
+# after_seconds        — how long motion must stay silent before stopping.
+# min_record_seconds   — clips shorter than this are discarded.
+# max_record_seconds   — hard cap on clip length.
+# record_fps           — frame rate of the saved MP4.
+# ----------------------------------------------------------------------------
+record_buffer_seconds: 2.0
+record_after_seconds: 3.0
+min_record_seconds: 3.0
+max_record_seconds: 300.0
+record_fps: 10.0
+
+# ----------------------------------------------------------------------------
+# Initial runtime state
+#
+# These are only the *startup* values. They are toggled at runtime via
+# POST /api/detection and POST /api/recording, and status is broadcast over
+# /events. Changing them here only affects a fresh process start.
+# ----------------------------------------------------------------------------
+detection_enabled: true
+recording_enabled: false

@@ -1,58 +1,56 @@
 {
-  "Balcony Camera": {
-    "x": 0.6004415011037527,
-    "y": 0.057858455882352944,
-    "width": 0.1876379690949228,
-    "height": 0.3,
-    "enabled": true
-  },
   "Kitchen": {
-    "x": 0.2028368794326241,
-    "y": 0.33019258034026466,
-    "width": 0.2595744680851064,
-    "height": 0.32325141776937616,
-    "enabled": true
-  },
-  "H40": {
-    "x": 0.05221932114882506,
-    "y": 0.07551175958188153,
-    "width": 0.26109660574412535,
-    "height": 0.5191637630662022,
-    "enabled": true
-  },
-  "Hik_vision": {
-    "x": 0,
-    "y": 0,
+    "x": 0.0,
+    "y": 0.0,
     "width": 1.0,
     "height": 1.0,
-    "enabled": false
+    "enabled": false,
+    "motion_threshold": null,
+    "min_area": null
   },
-  "Children Room": {
-    "x": 0,
-    "y": 0,
+  "Hikvision": {
+    "x": 0.0,
+    "y": 0.0,
     "width": 1.0,
     "height": 1.0,
-    "enabled": false
+    "enabled": false,
+    "motion_threshold": null,
+    "min_area": null
   },
-  "\u0421orridor": {
-    "x": 0,
-    "y": 0,
-    "width": 1.0,
-    "height": 1.0,
-    "enabled": false
+  "Children": {
+    "x": 0.6537554063979828,
+    "y": 0.012259948392962567,
+    "width": 0.3254660919284368,
+    "height": 0.11392374257294938,
+    "enabled": true,
+    "motion_threshold": 10,
+    "min_area": 1
   },
   "Corridor": {
-    "x": 0.16997792494481237,
-    "y": 0.08432904411764706,
-    "width": 0.2803532008830022,
-    "height": 0.46176470588235297,
-    "enabled": true
+    "x": 0.13093221617251502,
+    "y": 0.0,
+    "width": 0.3173871463841139,
+    "height": 0.5218377699016955,
+    "enabled": true,
+    "motion_threshold": 10,
+    "min_area": 1
   },
-  "": {
-    "x": 0.152317880794702,
-    "y": 0.057104627071823205,
-    "width": 0.24724061810154524,
-    "height": 0.3812154696132597,
-    "enabled": true
+  "H40": {
+    "x": 0.0,
+    "y": 0.0,
+    "width": 1.0,
+    "height": 1.0,
+    "enabled": false,
+    "motion_threshold": null,
+    "min_area": null
+  },
+  "Balcony": {
+    "x": 0.7405983461151517,
+    "y": 0.07057800619434162,
+    "width": 0.19417960748152763,
+    "height": 0.29829814314685826,
+    "enabled": true,
+    "motion_threshold": null,
+    "min_area": null
   }
 }
