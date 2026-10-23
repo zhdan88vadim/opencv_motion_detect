@@ -54,7 +54,7 @@ class ConfigManager:
         self.DISPLAY_WIDTH: int = 800
         self.DISPLAY_HEIGHT: int = 600
 
-        self.ROI_SETTINGS_FILE: str = "roi_settings.json"
+        self.ROI_SETTINGS_FILE: str = "ro_settings.json"
         self.DEFAULT_ROI: ROISettings = ROISettings(
             x=0.0,
             y=0.0,

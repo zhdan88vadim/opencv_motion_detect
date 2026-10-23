@@ -1,3 +1,21 @@
+<!-- 
+
+rm -rf .venv
+uv venv --python 3.11 
+source .venv/bin/activate
+uv pip install -e ".[dev]"
+
+
+If you don't want to activate the venv every time
+uv can run commands directly inside the venv:
+
+uv run pytest -q
+uv run mypy app
+uv run python -m app.main
+
+
+-->
+
 # OpenCV Motion Detection System
 
 ## 📋 Описание проекта

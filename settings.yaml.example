@@ -39,7 +39,7 @@ default_camera: "Balcony"
 # Storage
 # ----------------------------------------------------------------------------
 recordings_dir: "recordings"
-roi_settings_file: "roi_settings.json"
+roi_settings_file: "ro_settings.json"
 recordings_keep: 100            # number of newest recordings to keep
 
 # ----------------------------------------------------------------------------

@@ -23,7 +23,7 @@ htmlcov/
 .env.local
 .env.*.local
 settings.yaml
-roi_settings.json
+ro_settings.json
 
 # Media: exclude user recordings, keep test clips
 *.mp4
@@ -40,4 +40,3 @@ DOC/
 todo/
 *.mp4
 01_env_python.md
-roi_settings.json
