@@ -33,7 +33,7 @@ BALCONY_ROI = ROISettings(
 CLIPS: list[tuple[str, int]] = [
     ("short_clip.mp4", 3),
     ("motion_20261023_112414_832.mp4", 2),
-    ("one_motion.mp4", 2),
+    ("two_motions.mp4", 2),
 ]
 
 

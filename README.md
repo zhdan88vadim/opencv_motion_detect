@@ -1,5 +1,10 @@
 <!-- 
 
+# make gif
+ffmpeg -i version2.mp4 -vf "fps=5,scale=420:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" version2.gif 
+
+
+
 rm -rf .venv
 uv venv --python 3.11 
 source .venv/bin/activate
@@ -34,9 +39,6 @@ python apply_edits.py dump.txt edits.json -v
 
 ![demo](./readme_content/output.gif)
 
-> **⚠️ Внимание:** Проект находится в стадии активной разработки. Некоторые функции могут быть нестабильны или находиться в процессе реализации.
-
-
 ## ✅ Что реализовано
 
 - **MJPEG-стриминг** — `/stream.mjpg` с рамкой ROI и счётчиками
@@ -44,23 +46,18 @@ python apply_edits.py dump.txt edits.json -v
 - **SSE-события** — `/events` для статуса, записи и переключения камер
 - **Детекция движения** — MOG2 с фильтрацией теней
 - **Автоматическая запись** — pre-roll буфер и пост-ролл
-- **Фолбэк кодеков** — mp4v → avc1 → MJPG/.avi, если в сборке OpenCV нет H.264
 - **Аудио с камеры** — `/audio.wav` + кнопка включения в UI
 - **Переключение камер** — без перезапуска сервера
 - **Per-camera ROI** — рисуется мышью или пальцем в браузере, хранится в `roi_settings.json` в нормализованных координатах
-- **Per-camera пороги** — `motion_threshold` и `min_area` задаются для каждой камеры отдельно и переживают перезапуск
-- **Типизация** — строгий mypy, ruff для стиля
+- **Per-camera пороги** — `motion_threshold` и `min_area` задаются для каждой камеры отдельно
 
 ## 🚧 В планах
 
 - Уведомления о движении (Telegram / email / webhook)
-- Просмотр и удаление записей прямо из UI
 - Несколько одновременных потоков
-- Улучшенная обработка ошибок RTSP
 
 ## ✨ Основные возможности
 
-- **Просмотр видео в реальном времени** — MJPEG-стриминг с нескольких камер
 - **Детекция движения** — вычитание фона (MOG2) с настраиваемыми threshold и min_area
 - **Автоматическая запись** — клипы вокруг события, с буфером перед началом движения
 - **Аудио с камеры** — воспроизведение в браузере, включается по клику
@@ -97,9 +94,6 @@ python apply_edits.py dump.txt edits.json -v
     ├── settings.yaml.example      # шаблон конфига
     └── pyproject.toml             # пакет, ruff, mypy, pytest
 
-- **Один поток владеет cv2.VideoCapture.** `CaptureService.stop()` ждёт завершения потока и бросает исключение при таймауте, поэтому смена камер строго последовательна и не гоняется с cv2.
-- **MotionAnalyzer — чистый.** Принимает кадр и ROI, возвращает результат. Тестируется синтетическими кадрами без камеры.
-- **SSE — из рабочего потока через run_coroutine_threadsafe.** Публикация не блокирует event loop.
 
 ## 🚀 Установка и запуск
 
@@ -151,8 +145,7 @@ python apply_edits.py dump.txt edits.json -v
 ### Тесты
 
     pytest                              # unit + API
-    MOTION_SLOW_TESTS=1 pytest          # + бесконечный MJPEG
-    pytest -s -k dump                   # покадровая диагностика клипа
+    <!-- pytest -s -k dump                   # покадровая диагностика клипа -->
     mypy app                            # проверка типов
     ruff check app tests                # линтер
 
@@ -182,8 +175,6 @@ python apply_edits.py dump.txt edits.json -v
 | POST | `/api/roi` | Установить ROI |
 | POST | `/api/roi/{camera_name}/reset` | Сбросить ROI к полному кадру |
 
-`POST /api/params` требует camera_name; detection_enabled и recording_enabled опциональны и применяются глобально.
-
 ## ⚙️ Параметры настройки
 
 ### Детекция (per-camera, переопределяет глобальные)
@@ -206,7 +197,6 @@ python apply_edits.py dump.txt edits.json -v
 - Панель управления: выбор камеры, слайдеры threshold и min_area (per-camera), кнопки Detection / Record / Camera audio, ROI: включить / нарисовать / сбросить, поля X/Y/W/H
 - Статус-строка: соединение, камера, движение, запись
 - Уведомления о движении (WebAudio)
-- Работает с тачем — ROI рисуется пальцем
 
 ## 🎯 Алгоритм детекции
 

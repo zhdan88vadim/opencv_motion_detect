@@ -53,18 +53,12 @@ class Settings(BaseModel):
 def _default_raw() -> dict[str, Any]:
     return {
         "cameras": {
-            "Balcony": {
-                "url": "rtsp://192.168.0.102:8554/balcony_camera_hero_4mp_wifi_h264",
-                "has_audio": True,
-            },
             "Kitchen": {"url": "rtsp://192.168.0.102:8554/h1_long_1_h264", "has_audio": True},
             "H40": {"url": "rtsp://192.168.0.102:8554/h40_long_1_h264", "has_audio": True},
             "Hikvision": {
                 "url": "rtsp://192.168.0.102:8554/hikvision_room_sub",
                 "has_audio": False,
             },
-            "Children": {"url": "rtsp://192.168.0.102:8554/h2_long_1_wifi_h264", "has_audio": True},
-            "Corridor": {"url": "rtsp://192.168.0.102:8554/ESP32-CAM_video36", "has_audio": False},
         },
         "default_camera": "Balcony",
     }
