@@ -1,4 +1,45 @@
-__pycache__
-roi_settings.json
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local config / secrets
+.env
+.env.local
+.env.*.local
+settings.yaml
+ro_settings.json
+
+# Media: exclude user recordings, keep test clips
 *.mp4
+!tests/data/*.mp4
+recordings/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+DOC/
 todo/
+*.mp4
+01_env_python.md
+roi_settings.json
+output.txt
+.gitignore
